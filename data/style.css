@@ -1,0 +1,361 @@
+/* PongClock WebUI — style.css (ESP32-S3-LCD-3.16) */
+*,*::before,*::after{box-sizing:border-box}
+
+body {
+  background: #111;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  color: #888;
+}
+
+/* ── Header + tabs ─────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 0;
+  gap: 16px;
+}
+
+/* ── Pong logo header ───────────────────────────────────────────────────────── */
+h1.site-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1;
+}
+
+/* Black-on-white PNG: invert flips marks to white, screen blend dissolves the
+   inverted-white background into the page. */
+.logo-img {
+  height: 64px;
+  width: auto;
+  display: block;
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+
+.logo-clock {
+  font-family: 'Fredoka One', 'Arial Black', sans-serif;
+  font-size: 74px;
+  font-weight: 400;
+  color: #fff;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.tab-btn:hover  { color: #c8a000; }
+.tab-btn.active { background: #2a2200; color: #c8a000; }
+
+/* ── Main panels ───────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+}
+
+/* Wide enough to hold the 618px screen + PCB chrome (~664px total) */
+.tab-panel { display: none; width: 100%; max-width: 720px; }
+.tab-panel.active { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+/* ── PCB mockup ─────────────────────────────────────────────────────────────── */
+.pcb {
+  background: linear-gradient(150deg, #d4b000 0%, #b89400 50%, #c8a800 100%);
+  border-radius: 8px;
+  padding: 14px 18px 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.85),
+              inset 0 1px 0 rgba(255,255,255,.2),
+              inset 0 -1px 0 rgba(0,0,0,.3);
+}
+
+.pcb-id {
+  font-size: 7px;
+  color: rgba(0,0,0,.35);
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.bezel {
+  background: #080808;
+  border-radius: 3px;
+  padding: 5px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* Screen area — 800:320 = 5:2 ratio landscape, scaled 0.75× (600×240 CSS) */
+.screen {
+  width: 608px;
+  height: 248px;
+  background: #050200;
+  position: relative;
+  overflow: hidden;
+  border-radius: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Canvas is 800×320 native; CSS scales it 0.75× with pixelated rendering */
+#ledCanvas {
+  width: 600px;
+  height: 240px;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pcb-btm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+  padding: 0 2px;
+}
+
+.usb {
+  width: 32px; height: 10px;
+  background: #888;
+  border-radius: 2px;
+  border: 1px solid #666;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.6);
+}
+
+.chips { display: flex; gap: 5px; }
+.chip {
+  width: 10px; height: 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 1px;
+}
+
+.btn {
+  width: 9px; height: 9px;
+  background: radial-gradient(circle at 35% 35%, #777, #444);
+  border-radius: 50%;
+  border: 1px solid #333;
+}
+
+/* ── Mode bar ────────────────────────────────────────────────────────────────── */
+.mode-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mode-pill {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #666;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.mode-pill:hover  { border-color: #c8a000; color: #c8a000; }
+.mode-pill.active { background: #2a2200; border-color: #c8a000; color: #c8a000; }
+
+/* ── Config tab ─────────────────────────────────────────────────────────────── */
+.config-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-section {
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.form-section-title {
+  background: #1a1a1a;
+  color: #c8a000;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  margin: 0;
+}
+
+.form-rows {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.form-row label {
+  width: 130px;
+  font-size: 11px;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.form-row input[type=text],
+.form-row input[type=number],
+.form-row select {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #c8c8c8;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.form-row input:focus,
+.form-row select:focus { border-color: #c8a000; }
+
+.form-row input[type=range] {
+  flex: 1;
+  accent-color: #c8a000;
+}
+
+.form-row input[type=color] {
+  width: 40px;
+  height: 28px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #1a1a1a;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.toggle-wrap {
+  display: flex;
+  gap: 16px;
+}
+
+.toggle-wrap label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  width: auto;
+}
+
+.toggle-wrap input[type=radio],
+.toggle-wrap input[type=checkbox] {
+  accent-color: #c8a000;
+}
+
+.range-val {
+  font-size: 11px;
+  color: #c8a000;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-save, .btn-danger, .btn-secondary {
+  border: none;
+  border-radius: 5px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 8px 22px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.btn-save      { background: #c8a000; color: #111; }
+.btn-secondary { background: #2a2200; border: 1px solid #c8a000; color: #c8a000; }
+.btn-danger    { background: #5a1010; color: #ff8888; border: 1px solid #882020; }
+
+.btn-save:hover,
+.btn-secondary:hover,
+.btn-danger:hover { opacity: .8; }
+
+/* ── Status / toast ─────────────────────────────────────────────────────────── */
+#status-msg {
+  font-size: 11px;
+  color: #c8a000;
+  min-height: 16px;
+  text-align: center;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 10px;
+  color: #444;
+  letter-spacing: 1px;
+  border-top: 1px solid #1e1e1e;
+}
+
+footer a { color: #666; text-decoration: none; }
+footer a:hover { color: #c8a000; }
+
+/* ── Responsive — stack at narrower viewports ────────────────────────────────── */
+@media (max-width: 680px) {
+  .screen    { width: 408px; height: 168px; }
+  #ledCanvas { width: 400px; height: 160px; }
+  .pcb       { padding: 10px 12px 16px; }
+}
+
+@media (max-width: 440px) {
+  .screen    { width: 308px; height: 128px; }
+  #ledCanvas { width: 300px; height: 120px; }
+  .form-row  { flex-direction: column; align-items: flex-start; }
+  .form-row label { width: auto; }
+  .logo-img  { height: 44px; }
+  .logo-clock { font-size: 52px; }
+}
