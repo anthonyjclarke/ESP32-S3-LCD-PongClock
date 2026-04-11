@@ -1,4 +1,4 @@
-# ESP32-S3-LCD-3.16 PongClock
+# ESP32-S3-LCD-PongClock
 
 <!-- Update version badge when FW_VERSION changes in include/config.h -->
 ![Version](https://img.shields.io/badge/version-2.0.3-blue.svg)
@@ -7,6 +7,10 @@
 ![Board](https://img.shields.io/badge/Waveshare-ESP32--S3--LCD--3.16-yellow.svg)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
+
+---
+
+**Repository:** https://github.com/anthonyjclarke/ESP32-S3-LCD-PongClock
 
 ---
 
@@ -202,7 +206,7 @@ pio device monitor -b 115200 -p /dev/cu.usbmodem1301
 Expected boot output:
 
 ```
-[INFO]  === ESP32-S3 PongClock 2.0.1 starting ===
+[INFO]  === ESP32-S3 PongClock 2.0.3 starting ===
 [INFO]  Config loaded: mode=0 bright=180 ampm=0 tz=Australia/Sydney
 [INFO]  WiFi connected: 192.168.1.180
 [INFO]  Time synced: 14:32:05 11-Apr-2026  tz=AEST  offset=+1000
