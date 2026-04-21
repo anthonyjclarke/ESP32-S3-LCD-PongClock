@@ -1,12 +1,16 @@
-# ESP32-S3-LCD-3.16 PongClock
+# ESP32-S3-LCD-PongClock
 
 <!-- Update version badge when FW_VERSION changes in include/config.h -->
-![Version](https://img.shields.io/badge/version-2.0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.5-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP32--S3-green.svg)
 ![PlatformIO](https://img.shields.io/badge/PlatformIO-6.x-orange.svg)
 ![Board](https://img.shields.io/badge/Waveshare-ESP32--S3--LCD--3.16-yellow.svg)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
+
+---
+
+**Repository:** https://github.com/anthonyjclarke/ESP32-S3-LCD-PongClock
 
 ---
 
@@ -93,7 +97,7 @@ Pins are wired BGR on the PCB; `rgb_order = true` in the panel config corrects c
 | DE     | 40   |
 | PCLK   | 41   |
 
-RGB pixel clock: 18 MHz.
+RGB pixel clock: 14 MHz (ceiling with WiFi active — see Known Quirks).
 
 ---
 
@@ -113,10 +117,10 @@ pio run -t upload
 
 If upload fails, enter the bootloader manually:
 
-1. Close any serial monitor on `/dev/cu.usbmodem1301`
+1. Close any serial monitor
 2. Hold `BOOT`, press and release `RST`, then release `BOOT`
 3. Retry the upload command
-4. Press `RST` once after upload completes if the board does not auto-run
+4. Press `RST` once after upload completes
 
 ### 3. Flash the filesystem
 
@@ -127,6 +131,8 @@ pio run -t uploadfs
 ```
 
 **This step is required on first flash and any time you change files in `data/`.** Without it the web UI returns 404 and `/api/*` endpoints do not respond.
+
+> **Note:** `platformio.ini` sets `upload_flags = --no-stub`, which uses the ROM bootloader instead of the stub flasher. This is required for reliable filesystem upload over USB CDC. After `uploadfs` the device does **not** auto-reset — press `RST` manually to boot the application.
 
 ---
 
@@ -196,13 +202,15 @@ If the display goes dark after init but briefly shows a valid image during reset
 ## Serial Monitor
 
 ```bash
-pio device monitor -b 115200 -p /dev/cu.usbmodem1301
+pio device monitor -b 115200 -p /dev/cu.usbmodem2301
 ```
+
+The port number varies — use `ls /dev/cu.usbmodem*` to find the current name.
 
 Expected boot output:
 
 ```
-[INFO]  === ESP32-S3 PongClock 2.0.1 starting ===
+[INFO]  === ESP32-S3 PongClock 2.0.5 starting ===
 [INFO]  Config loaded: mode=0 bright=180 ampm=0 tz=Australia/Sydney
 [INFO]  WiFi connected: 192.168.1.180
 [INFO]  Time synced: 14:32:05 11-Apr-2026  tz=AEST  offset=+1000
@@ -221,4 +229,6 @@ After WiFi connects, "IP" and the address appear on the LED matrix for 2.5 secon
 - PSRAM requires `board_build.arduino.memory_type = qio_opi`. Without it, PSRAM is unavailable and the sprite allocation silently fails.
 - `kScreenHeight = 820` is correct — this is a tall 320×820 portrait panel; `setRotation(1)` produces the logical 820×320 landscape orientation used by PongClock.
 - Backlight LEDC uses channel 1 on timer 3. Any additional LEDC peripherals must use different channel and timer numbers.
-- USB CDC port is `/dev/cu.usbmodem1301`. It disappears during upload and reappears after reset — this is normal.
+- USB CDC port is `/dev/cu.usbmodem2301` (number varies — re-enumerates on each reset). It disappears during upload and reappears after reset — this is normal.
+- **RGB PCLK ceiling**: `kRgbClockHz` must be ≤ 14 MHz with WiFi active. At 18 MHz the LCD DMA saturates the shared PSRAM bus and causes vertical display jitter. Do not raise the clock without re-testing under WiFi load.
+- **Sprite allocation**: `LGFX_Sprite` defaults to `MALLOC_CAP_DMA` (internal SRAM only). After a crash reset the internal heap is often too fragmented for a contiguous 256 KB block; the code falls back to PSRAM automatically via `setPsram(true)` on retry.

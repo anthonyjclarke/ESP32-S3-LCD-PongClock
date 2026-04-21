@@ -383,6 +383,7 @@ const MODE_NAMES = ['Slide', 'Pong', 'Digits', 'Word Clock', 'Invaders'];
 
 function startMode(modeName) {
   activeMode = modeName;
+  cfg.mode = MODE_KEYS.indexOf(modeName);
   cls();
   pushMatrix();
   applyBrightness();
@@ -398,20 +399,15 @@ function startMode(modeName) {
   document.querySelectorAll('.mode-pill').forEach(el => {
     el.classList.toggle('active', el.dataset.mode === modeName);
   });
-
-  const radio = document.querySelector(`input[name="mode"][value="${MODE_KEYS.indexOf(modeName)}"]`);
-  if (radio) radio.checked = true;
 }
 
-function switchMode(newMode) {
+async function switchMode(newMode) {
+  if (!MODE_KEYS.includes(newMode) || activeMode === newMode) return;
+  cfg.mode = MODE_KEYS.indexOf(newMode);
   activeMode = null;
   setTimeout(() => startMode(newMode), 120);
 
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode: MODE_KEYS.indexOf(newMode) }),
-  }).catch(() => {});
+  await saveDeviceConfig({ mode: cfg.mode });
 }
 
 function applyBrightness() {
@@ -924,9 +920,6 @@ async function saveDeviceConfig(patch) {
 
 // ── Form ──────────────────────────────────────────────────────────────────────
 function populateForm() {
-  const modeRadio = document.querySelector(`input[name="mode"][value="${cfg.mode}"]`);
-  if (modeRadio) modeRadio.checked = true;
-
   const bright = document.getElementById('cfg-brightness');
   if (bright) { bright.value = cfg.brightness; updateRange(bright); }
 
@@ -1015,12 +1008,6 @@ function wireUI() {
 
   document.querySelectorAll('.mode-pill').forEach(pill => {
     pill.addEventListener('click', () => switchMode(pill.dataset.mode));
-  });
-
-  document.querySelectorAll('input[name="mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      if (radio.checked) switchMode(MODE_KEYS[parseInt(radio.value, 10)]);
-    });
   });
 
   const bright = document.getElementById('cfg-brightness');

@@ -18,7 +18,7 @@ PongClock port for the Waveshare ESP32-S3-LCD-3.16. Drives the ST7701 RGB panel 
 - **Backlight**: GPIO6, inverted LEDC PWM — duty 0 = full brightness, 255 = off. This is opposite to typical active-high setups.
 - **LCD command interface**: GPIO0 (CS), GPIO1 (MOSI), GPIO2 (SCK), GPIO16 (RST) — this is a sideband SPI interface for ST7701 init commands, separate from the RGB pixel data bus.
 - **RGB bus**: 16-bit parallel across GPIOs 3, 5, 8–14, 17–18, 21, 45–48 — see `config.h` for full pin mapping.
-- **USB CDC**: Serial routes over native USB, not CP2102. Port is `/dev/cu.usbmodem1301`.
+- **USB CDC**: Serial routes over native USB, not CP2102. Port is typically `/dev/cu.usbmodem2301` (number varies — re-enumerates on each reset; update `upload_port` / `monitor_port` in `platformio.ini` if the port changes).
 
 ## Source Structure
 
@@ -41,6 +41,10 @@ LovyanGFX (`lovyan03/LovyanGFX`) is required. `TFT_eSPI` cannot drive an ST7701 
 `WaveshareDisplay` is defined in `include/waveshare_display.h` and extends `lgfx::LGFX_Device`. It contains an inner class `WavesharePanel` that extends `lgfx::Panel_ST7701_Base` and overrides `getInitCommands()` with the full vendor init sequence.
 
 LovyanGFX framebuffer is allocated in PSRAM (`use_psram = 1` in `panel_.config_detail()`). PSRAM must be present and correctly configured — if it is absent, display init will silently fail or produce garbage output.
+
+**Sprite allocation** — `LGFX_Sprite._psram` defaults to `false`, meaning `createSprite()` allocates from DMA-capable internal SRAM only (`MALLOC_CAP_DMA`). After a crash/watchdog reset the internal heap is often fragmented enough that a contiguous 256 KB DMA block is unavailable, causing sprite allocation to fail even with 7+ MB of PSRAM free (`ESP.getFreePsram()` reports the total, not contiguous availability). The fix: call `setPsram(false)` (or omit it — it is the default), attempt `createSprite()`, and if that returns null call `setPsram(true)` and retry. This keeps the sprite in fast internal RAM on normal boots and falls back to PSRAM only on crash-recovery boots.
+
+**`cls()` is a single `fillSprite(colourOff)` call** — the previous 80×32 loop of `fillRoundRect(colourOff)` was drawing the off-LED colour on top of an already-off-LED background: visually identical but 2560 individual PSRAM writes per frame. At 50 fps with WiFi active those writes competed with the LCD DMA's continuous PSRAM reads and caused display sync loss (vertical jitter). Do not restore the loop.
 
 ## Web Server Architecture
 
@@ -69,13 +73,15 @@ Clock mode rendering uses PROGMEM byte arrays in `include/fonts.h`: `myfont[68][
 - RGB bus data pins are wired in BGR order (d0–d4 = Blue, d5–d10 = Green, d11–d15 = Red). The panel config sets `rgb_order = true` to swap R/B and produce correct colours. If colours look wrong, check this flag first.
 - Backlight LEDC uses **channel 1** (`kBacklightPwmChannel`) on **timer 3** (`LEDC_TIMER_3`). Any future LEDC peripheral (e.g. buzzer, additional PWM) must use a different channel and timer.
 - `gfx.setRotation(1)` is landscape orientation (logical 820×320) used by PongClock. The physical panel is portrait (320×820); rotation 1 flips it so the wide axis is horizontal.
+- **RGB PCLK ceiling with WiFi**: `kRgbClockHz` must be ≤ 14 MHz when WiFi is active. At 18 MHz the LCD DMA demands ~27 MB/s of PSRAM bandwidth; combined with WiFi buffer traffic this saturates the PSRAM bus and causes intermittent DMA underruns visible as vertical jitter (display rolling up/down). At 14 MHz the demand drops to ~21 MB/s, which leaves enough headroom. Do not raise the clock above 14 MHz without re-testing under WiFi load.
 - **Button GPIO4**: wired to GND with `INPUT_PULLUP`. Active LOW. Not connected to the RGB bus or LCD interface.
 
 ## Flashing Notes
 
-- Port: `/dev/cu.usbmodem1301`
-- If upload fails: hold BOOT → press RST → release BOOT → retry upload → press RST after flash completes
-- No special upload flags required beyond what is in `platformio.ini`
+- Port: typically `/dev/cu.usbmodem2301` (varies — check `ls /dev/cu.usbmodem*` if upload fails to find the current name)
+- `platformio.ini` sets `upload_flags = --no-stub` — this bypasses the stub flasher and uses the ROM bootloader directly. Required for reliable `uploadfs` over USB CDC; without it the stub's higher-speed protocol drops the connection mid-transfer at 0%.
+- If upload still fails: hold BOOT → press RST → release BOOT → retry upload → press RST after flash completes
+- After `uploadfs`: the device does **not** auto-reset with `--no-stub`. Press RST manually to boot the application.
 
 ## Global Rules That Do Not Apply Here
 
