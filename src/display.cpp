@@ -51,9 +51,15 @@ void initColours() {
   colourOn  = gfx.color565(COLOUR_LED_ON_R,  COLOUR_LED_ON_G,  COLOUR_LED_ON_B);
   colourOff = gfx.color565(COLOUR_LED_OFF_R, COLOUR_LED_OFF_G, COLOUR_LED_OFF_B);
 
-  // 8-bit depth (RGB332): 800×320 = 256 KB — allocated in PSRAM by LovyanGFX.
+  // 8-bit depth (RGB332): 800×320 = 256 KB.
+  // Try DMA-capable internal RAM first (faster, less PSRAM bus pressure).
+  // Fall back to PSRAM if internal heap is fragmented (e.g. after a crash reset).
   matrixSprite.setColorDepth(8);
   void* buf = matrixSprite.createSprite(LED_WIDTH * PIXEL_SIZE, LED_HEIGHT * PIXEL_SIZE);
+  if (!buf) {
+    matrixSprite.setPsram(true);
+    buf = matrixSprite.createSprite(LED_WIDTH * PIXEL_SIZE, LED_HEIGHT * PIXEL_SIZE);
+  }
   if (!buf) {
     DBG_ERROR("Sprite alloc FAILED — heap %d bytes, PSRAM %d bytes",
               ESP.getFreeHeap(), ESP.getFreePsram());
@@ -82,14 +88,11 @@ void pushMatrix() {
 }
 
 void cls() {
+  // fillSprite already sets every pixel — including all LED cell areas — to
+  // colourOff. A redundant 80×32 loop of fillRoundRect(colourOff) over an
+  // already-colourOff background produced 2560 unnecessary PSRAM writes per
+  // frame, which caused display jitter under PSRAM bus contention with WiFi.
   matrixSprite.fillSprite(colourOff);
-  for (int x = 0; x < LED_WIDTH; x++) {
-    for (int y = 0; y < LED_HEIGHT; y++) {
-      int px = x * PIXEL_SIZE + PIXEL_MARGIN;
-      int py = y * PIXEL_SIZE + PIXEL_MARGIN;
-      matrixSprite.fillRoundRect(px, py, PIXEL_INNER, PIXEL_INNER, 1, colourOff);
-    }
-  }
 }
 
 void clsNow() {

@@ -120,7 +120,11 @@ static void showBootIpOnMatrix(const char* ip) {
 static void initWiFi() {
   showStatus("Connecting WiFi...");
   WiFiManager wm;
-  wm.setConfigPortalTimeout(WIFI_TIMEOUT_S);
+  bool hasSavedWifi = WiFi.SSID().length() > 0;
+  wm.setConfigPortalTimeout(hasSavedWifi ? WIFI_TIMEOUT_S : 0);
+  DBG_INFO("WiFiManager portal timeout: %d s (%s credentials)",
+           hasSavedWifi ? WIFI_TIMEOUT_S : 0,
+           hasSavedWifi ? "saved" : "no saved");
 
   if (!wm.autoConnect(WIFI_AP_NAME)) {
     DBG_WARN("WiFi: connect timeout, continuing offline");

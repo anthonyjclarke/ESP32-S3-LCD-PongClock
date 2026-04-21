@@ -105,6 +105,10 @@ static void serviceNetworkDelay(uint32_t delayMs) {
   }
 }
 
+static bool keepRunningMode(byte expectedMode) {
+  return run_mode() && clock_mode == expectedMode;
+}
+
 // ── Font helpers (index mapping) ──────────────────────────────────────────────
 static byte charIndex5x7(char c) {
   if (c >= 'A' && c <= 'Z') return (byte)(c & 0x1F);
@@ -406,7 +410,7 @@ void slide() {
   byte old_secs = rtc[0];
   byte old_mins = rtc[1];
 
-  while (run_mode()) {
+  while (keepRunningMode(0)) {
     tickHousekeeping();
 
     int8_t btn = checkButton();
@@ -647,7 +651,7 @@ void pong() {
   cls();
   draw_pong_net(netOffset);
 
-  while (run_mode() && !restart) {
+  while (keepRunningMode(1) && !restart) {
     tickHousekeeping();
 
     int8_t btn = checkButton();
@@ -658,6 +662,7 @@ void pong() {
 
     if (ledColourChanged) {
       ledColourChanged = false;
+      cls();
       bat1_upd = true;
       bat2_upd = true;
     }
@@ -781,7 +786,7 @@ void digits() {
   set_next_date();
   cls(); pushMatrix();
 
-  while (run_mode()) {
+  while (keepRunningMode(2)) {
     tickHousekeeping();
 
     int8_t btn = checkButton();
@@ -792,6 +797,7 @@ void digits() {
 
     if (ledColourChanged) {
       ledColourChanged = false;
+      cls();
       mins = 100;
       secs = 100;
     }
@@ -852,7 +858,7 @@ void word_clock() {
 
   byte old_mins = 100;
 
-  while (run_mode()) {
+  while (keepRunningMode(3)) {
     tickHousekeeping();
 
     int8_t btn = checkButton();
@@ -863,6 +869,7 @@ void word_clock() {
 
     if (ledColourChanged) {
       ledColourChanged = false;
+      cls();
       old_mins = 100;
     }
 
@@ -938,13 +945,14 @@ static bool invader_scroll(byte ypos, int xstart, int xend, byte type) {
   int  xstep  = (xstart < xend) ? 1 : -1;
 
   for (int i = xstart; i != xend; i += xstep) {
+    if (clock_mode != 4) { fade_down(); return false; }
     draw_invader(i, ypos, type, wiggle);
     wiggle = !wiggle;
     pushMatrix();
 
     uint32_t t0 = millis();
     while (millis() - t0 < INVADER_SCROLL_DELAY) {
-      if (!run_mode()) {
+      if (clock_mode != 4 || !run_mode()) {
         fade_down();
         return false;
       }
@@ -994,7 +1002,7 @@ void invaders() {
 
   DBG_INFO("Invaders: %02d:%02d  NTP=%d", rtc[2], rtc[1], (int)timeStatus());
 
-  while (run_mode()) {
+  while (keepRunningMode(4)) {
     tickHousekeeping();
 
     int8_t btn = checkButton();
@@ -1005,6 +1013,7 @@ void invaders() {
 
     if (ledColourChanged) {
       ledColourChanged = false;
+      cls();
       prev_mins = 255;
     }
 

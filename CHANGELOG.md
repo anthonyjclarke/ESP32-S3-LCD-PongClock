@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.0.5] 2026-04-21
+
+### Fixed
+- Display jitter (vertical roll) when WiFi is active: `cls()` was calling `fillRoundRect(colourOff)` 2560 times (80×32 grid) over an already-`colourOff` background — visually a no-op but 2560 individual PSRAM writes per frame at 50 fps. Combined with the LCD DMA's continuous PSRAM reads and WiFi's PSRAM buffer traffic, this saturated the PSRAM bus and caused intermittent DMA underruns that manifested as display sync loss. Fix: `cls()` is now a single `fillSprite(colourOff)` bulk-fill.
+- RGB pixel clock reduced from 18 MHz to 14 MHz (`kRgbClockHz` in `config.h`), reducing the LCD DMA's continuous PSRAM read rate from ~27 MB/s to ~21 MB/s and providing sufficient bandwidth headroom for WiFi under sustained load.
+- LittleFS filesystem upload via USB CDC (`pio run -t uploadfs`) stalling at 0% with "The chip stopped responding": added `upload_flags = --no-stub` to `platformio.ini`, bypassing the stub flasher and using the ROM bootloader directly. The stub flasher's higher-speed protocol caused the USB CDC connection to drop mid-transfer on this board.
+- Sprite allocation failure after a crash/watchdog reset: `createSprite()` defaults to `MALLOC_CAP_DMA` (internal SRAM only). After a non-clean reset the internal heap is fragmented enough that a contiguous 256 KB DMA block is unavailable, causing the sprite to fail even with 7+ MB of PSRAM free. Fix: try DMA allocation first (preferred — avoids PSRAM bus pressure during `pushSprite`); if that fails, `setPsram(true)` and retry, falling back to PSRAM.
+
+### Changed
+- `FW_VERSION` bumped to `2.0.5` in `include/config.h`.
+
+## [2.0.4] 2026-04-21
+
+### Fixed
+- All 5 clock mode `while` loops now use `keepRunningMode(n)` instead of bare `run_mode()`, so a mode change via the web API takes effect immediately without waiting for the current loop iteration to complete. Port of CYD_PongClock commit `7842f8c`.
+- Pong, Digits, Word Clock, and Invaders `ledColourChanged` handlers now call `cls()` before repaint, clearing stale off-state pixels that persisted in the old colour. Slide mode already had this fix. Port of CYD_PongClock commit `e38f682`.
+- Invaders `invader_scroll()`: added `clock_mode != 4` guard at the start of each scroll step and in the per-step delay loop, so an externally triggered mode change (e.g. via web API) exits the scroll immediately rather than waiting for the current scroll pass to finish. Port of CYD_PongClock commit `7842f8c`.
+- WiFi portal timeout now set to `0` (no timeout) on first boot when no saved credentials exist, so the captive portal stays open until the user connects. Previously the portal would time out after 60 s even on a blank device. Port of CYD_PongClock commit `7842f8c`.
+
+### Changed
+- Web UI: mode selection is now pills-only. The duplicate mode radio buttons in the Config tab have been removed — mode changes always go through the Clock tab pill row, which saves the selection to the device immediately. Port of CYD_PongClock commits `868ce75` / `7842f8c`.
+- `FW_VERSION` bumped to `2.0.4` in `include/config.h`.
+
 ## [2.0.3] 2026-04-11
 
 ### Fixed

@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 // ── Firmware ──────────────────────────────────────────────────────────────────
-#define FW_VERSION        "2.0.3"
+#define FW_VERSION        "2.0.5"
 #define FIRMWARE_VERSION  FW_VERSION   // alias for badge/display use
 
 // ── Hardware pins (Waveshare ESP32-S3-LCD-3.16) ───────────────────────────────
@@ -43,7 +43,7 @@ constexpr int kPinB2 = 45;
 constexpr int kPinB3 = 48;
 constexpr int kPinB4 = 47;
 
-constexpr uint32_t kRgbClockHz = 18000000;
+constexpr uint32_t kRgbClockHz = 14000000;
 
 constexpr uint8_t  kBacklightDefaultBrightness = 255;
 constexpr uint8_t  kBacklightMinBrightness     = 0;
