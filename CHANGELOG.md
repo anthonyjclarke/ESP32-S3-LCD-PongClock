@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.6] 09-10-2026
+
+### Fixed
+- WiFi portal timeout was always `0` (portal open forever), so a board with saved but unreachable WiFi never fell back to offline mode. `initWiFi()` tested `WiFi.SSID()`, which is only the network currently joined and is always empty before `autoConnect()`. It now starts the STA driver with `WiFi.mode(WIFI_STA)` and asks `wm.getWiFiIsSaved()`, which reads the stored STA config. Port of CYD_PongClock commit `2862967`.
+
+### Changed
+- `FW_VERSION` bumped to `2.0.6` in `include/config.h`.
+
 ## [2.0.5] 2026-04-21
 
 ### Fixed
