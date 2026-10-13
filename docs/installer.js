@@ -3,6 +3,8 @@ const confirmation = document.getElementById('confirm');
 const status = document.getElementById('status');
 const progress = document.getElementById('progress');
 const log = document.getElementById('log');
+const completion = document.getElementById('completion');
+const completionDetail = document.getElementById('completion-detail');
 const supported = window.isSecureContext && 'serial' in navigator;
 let busy = false;
 
@@ -29,6 +31,8 @@ async function install(environment) {
   updateButtons();
   log.textContent = '';
   progress.value = 0;
+  completion.hidden = true;
+  completionDetail.textContent = '';
   let transport;
   let port;
   let unload;
@@ -98,6 +102,10 @@ async function install(environment) {
     }
     progress.value = 100;
     status.textContent = `Installed PongClock v${manifest.version} on ${manifest.board}. Press RST to start the clock.`;
+    completionDetail.textContent = `PongClock v${manifest.version} installed on ${manifest.board}. Firmware and web files verified successfully.`;
+    completion.hidden = false;
+    appendLog('COMPLETED — all installation files verified. Press RST on your board to start the clock.');
+    completion.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (error) {
     status.textContent = error.name === 'NotFoundError' ? 'No serial port selected. Choose your board to try again.' :
       `Installation failed: ${error.message} Enter BOOT + RST download mode and retry, or use PlatformIO.`;

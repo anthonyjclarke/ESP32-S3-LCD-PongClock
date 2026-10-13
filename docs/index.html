@@ -19,16 +19,21 @@
     <p>Check the name printed on your board. Both use an ESP32-S3, so the browser cannot distinguish their displays. Choosing the wrong firmware can leave the screen blank.</p>
     <div class="boards">
       <article>
+        <a href="https://www.waveshare.com/product/esp32-s3-lcd-3.16.htm"><img class="board-photo" src="assets/board-waveshare.jpg" alt="Waveshare ESP32-S3-LCD-3.16 board" width="800" height="800"></a>
         <h3>Waveshare ESP32-S3-LCD-3.16</h3>
         <p>3.16″ · 320 × 820 · ST7701 RGB display<br>16 MB flash · 8 MB PSRAM<br>Clock controls: web interface</p>
+        <p><a href="https://www.waveshare.com/product/esp32-s3-lcd-3.16.htm">Official product</a> · <a href="https://www.waveshare.com/wiki/ESP32-S3-LCD-3.16">Board documentation</a></p>
         <button type="button" data-board="waveshare_lcd316" disabled>Install on Waveshare 3.16</button>
       </article>
       <article>
+        <a href="https://lilygo.cc/en-us/products/t-display-s3"><img class="board-photo" src="assets/board-tdisplay-s3.jpg" alt="LilyGO T-Display-S3 board, front and rear" width="800" height="800"></a>
         <h3>LilyGO T-Display-S3</h3>
         <p>1.9″ · 170 × 320 · ST7789 display<br>16 MB flash · 8 MB PSRAM<br>Clock controls: KEY button + web interface</p>
+        <p><a href="https://lilygo.cc/en-us/products/t-display-s3">Official product</a> · <a href="https://wiki.lilygo.cc/products/t-display-series/t-display-s3/">Board documentation</a></p>
         <button type="button" data-board="tdisplay_s3" disabled>Install on T-Display-S3</button>
       </article>
     </div>
+    <p class="note">Board photos: Waveshare and LilyGO. Screens shown in these manufacturer photos are their demos.</p>
     <p class="note">For these two boards only. Other Waveshare displays, the original T-Display, T-Display-S3 AMOLED and T-Display-S3 Pro need different firmware. Touch input is not supported.</p>
     <label class="confirm"><input type="checkbox" id="confirm"> I have checked my board model and understand this replaces its firmware and web files. WiFi and clock settings are retained with the existing PongClock partition layout.</label>
   </section>
@@ -45,12 +50,41 @@
   </section>
   <section aria-labelledby="status-heading">
     <h2 id="status-heading">Installation</h2>
+    <div id="completion" class="completion" role="status" aria-live="polite" hidden>
+      <span class="completion-icon" aria-hidden="true">✓</span>
+      <div>
+        <h3>Installation completed</h3>
+        <p id="completion-detail"></p>
+        <p class="completion-next">Press <strong>RST</strong> on your board to start the clock.</p>
+      </div>
+    </div>
     <p id="status" role="status" aria-live="polite">Loading installer…</p>
     <progress id="progress" value="0" max="100" aria-label="Installation progress"></progress>
     <details><summary>Installation log</summary><pre id="log"></pre></details>
     <noscript>Enable JavaScript to install, or use the PlatformIO instructions linked above.</noscript>
   </section>
-  <footer>Open source · MIT · Browser flashing powered by <a href="https://github.com/espressif/esptool-js">Espressif esptool-js</a></footer>
+  <section aria-labelledby="modes-heading">
+    <h2 id="modes-heading">Five ways to tell the time</h2>
+    <p class="note">Examples captured from PongClock’s browser preview. These show one animation frame; both boards share the same LED-grid layout.</p>
+    <div class="gallery">
+      <figure><img src="assets/mode-slide.png" alt="Slide clock preview" loading="lazy"><figcaption>Slide · hours, minutes and seconds slide into place</figcaption></figure>
+      <figure><img src="assets/mode-pong.png" alt="Pong clock preview" loading="lazy"><figcaption>Pong · the game score tells the time</figcaption></figure>
+      <figure><img src="assets/mode-digits.png" alt="Digits clock preview" loading="lazy"><figcaption>Digits · large digits with morphing transitions</figcaption></figure>
+      <figure><img src="assets/mode-word.png" alt="Word Clock preview" loading="lazy"><figcaption>Word Clock · time written in words</figcaption></figure>
+      <figure><img src="assets/mode-invaders.png" alt="Invaders clock preview" loading="lazy"><figcaption>Invaders · an alien scrolls below the time</figcaption></figure>
+    </div>
+  </section>
+  <section aria-labelledby="webui-heading">
+    <h2 id="webui-heading">Control your clock over WiFi</h2>
+    <p>Open the clock’s IP address to switch modes, adjust brightness and colours, or set your timezone.</p>
+    <p class="note">Actual web UI screenshots with example device and network details. The pictured PCB is the UI’s illustration.</p>
+    <div class="gallery webui-gallery">
+      <figure><a href="assets/webui-waveshare.png"><img src="assets/webui-waveshare.png" alt="Waveshare Clock tab with mode selector and Device panel" loading="lazy"></a><figcaption>Clock tab · Waveshare</figcaption></figure>
+      <figure><a href="assets/webui-lilygo.png"><img src="assets/webui-lilygo.png" alt="LilyGO Clock tab with T-Display-S3 device information" loading="lazy"></a><figcaption>Clock tab · LilyGO</figcaption></figure>
+      <figure><a href="assets/webui-config.png"><img src="assets/webui-config.png" alt="Config tab with display, clock and network settings" loading="lazy"></a><figcaption>Config tab · settings and screenshot download</figcaption></figure>
+    </div>
+  </section>
+  <footer>Code · MIT · Board photos © their manufacturers · Browser flashing powered by <a href="https://github.com/espressif/esptool-js">Espressif esptool-js</a></footer>
 </main>
 </body>
 </html>

@@ -30,6 +30,7 @@ def export(output, framework):
     output.mkdir(parents=True, exist_ok=True)
     for name in ("index.html", "installer.js", "style.css"):
         shutil.copyfile(ROOT / "docs" / name, output / name)
+    shutil.copytree(ROOT / "docs/assets", output / "assets", dirs_exist_ok=True)
     (output / ".nojekyll").touch()
     for env, board in BOARDS.items():
         build = ROOT / ".pio/build" / env

@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Prominent green “Installation completed” banner after all installer files pass verification, with a checkmark and a clear instruction to press RST. A new attempt clears the previous completion message.
+- README and GitHub Pages visuals: official board photos and manufacturer links, all five clock-mode previews, Clock tabs for both boards and the Config tab. Browser screenshots use clearly labelled example data and can be regenerated with `scripts/capture_docs.mjs`.
 - GitHub Pages USB installer with separate, explicitly labelled options for Waveshare ESP32-S3-LCD-3.16 and LilyGO T-Display-S3.
 - ROM-only browser flashing using pinned esptool-js, firmware plus LittleFS installation, download checksums and flash verification.
 - GitHub Actions builds and packages both board images, tests installer behavior, and publishes only from `main`.

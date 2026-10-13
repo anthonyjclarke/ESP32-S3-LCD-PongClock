@@ -11,8 +11,8 @@ const source = readFileSync(new URL('../docs/installer.js', import.meta.url), 'u
 function harness({ environment = 'waveshare_lcd316', chip = 'ESP32-S3', flashSize = '16MB',
   corrupt = false, mismatch = false, supported = true, cancel = false, verificationFails = false,
   writeFails = false } = {}) {
-  const elements = Object.fromEntries(['confirm', 'status', 'progress', 'log'].map(id =>
-    [id, { checked: true, textContent: '', value: 0, addEventListener() {} }]));
+  const elements = Object.fromEntries(['confirm', 'status', 'progress', 'log', 'completion', 'completion-detail'].map(id =>
+    [id, { checked: true, hidden: true, textContent: '', value: 0, addEventListener() {}, scrollIntoView() {} }]));
   const buttons = [{ dataset: { board: environment }, addEventListener() {} }];
   const calls = [];
   const data = new Uint8Array([0xE9, 1, 2, 3]);
@@ -39,6 +39,7 @@ function harness({ environment = 'waveshare_lcd316', chip = 'ESP32-S3', flashSiz
         assert.equal(new DataView(packet.buffer).getUint32(4, true), 0x1000000);
       }
       if (command === this.ESP_SPI_FLASH_MD5) {
+        assert.equal(elements.completion.hidden, true, 'Completion stays hidden until verification passes');
         assert.equal(new DataView(packet.buffer).getUint32(0, true), 0x10000);
         return new TextEncoder().encode(verificationFails ? '0'.repeat(32) : md5);
       }
@@ -73,7 +74,8 @@ function harness({ environment = 'waveshare_lcd316', chip = 'ESP32-S3', flashSiz
     URL, Uint8Array, DataView, TextDecoder, TextEncoder, crypto: webcrypto,
   });
   new vm.Script(source).runInContext(context);
-  return { elements, buttons, calls, install: () => vm.runInContext(`install('${environment}')`, context) };
+  return { elements, buttons, calls, cancelNext() { cancel = true; },
+    install: () => vm.runInContext(`install('${environment}')`, context) };
 }
 
 for (const environment of ['waveshare_lcd316', 'tdisplay_s3']) {
@@ -85,6 +87,9 @@ for (const environment of ['waveshare_lcd316', 'tdisplay_s3']) {
     assert.equal(h.calls[0], 'requestPort');
     assert.ok(h.calls.includes(`https://example.org/ESP32-S3-LCD-PongClock/firmware/${environment}/manifest.json`));
     assert.ok(h.calls.includes('disconnect'));
+    assert.equal(h.elements.completion.hidden, false);
+    assert.match(h.elements['completion-detail'].textContent, /verified successfully/);
+    assert.match(h.elements.log.textContent, /COMPLETED/);
   });
 }
 for (const [name, options] of [
@@ -97,6 +102,7 @@ for (const [name, options] of [
     assert.match(h.elements.status.textContent, /Installation failed/);
     assert.ok(!h.calls.includes('flash'));
     assert.equal(h.buttons[0].disabled, false);
+    assert.equal(h.elements.completion.hidden, true);
   });
 }
 test('rejects failed flash verification and releases the port', async () => {
@@ -104,6 +110,7 @@ test('rejects failed flash verification and releases the port', async () => {
   await h.install();
   assert.match(h.elements.status.textContent, /Flash verification failed/);
   assert.ok(h.calls.includes('disconnect'));
+  assert.equal(h.elements.completion.hidden, true);
 });
 test('releases the port after a write failure', async () => {
   const h = harness({ writeFails: true });
@@ -122,4 +129,13 @@ test('cancelled port selection permits retry', async () => {
   await h.install();
   assert.match(h.elements.status.textContent, /No serial port selected/);
   assert.equal(h.buttons[0].disabled, false);
+});
+test('a new attempt clears the previous completion message', async () => {
+  const h = harness();
+  await h.install();
+  assert.equal(h.elements.completion.hidden, false);
+  h.cancelNext();
+  await h.install();
+  assert.equal(h.elements.completion.hidden, true);
+  assert.equal(h.elements['completion-detail'].textContent, '');
 });

@@ -19,10 +19,12 @@ PongClock for ESP32-S3 display boards. Renders an 80×32 virtual LED grid via Lo
 
 | Board                        | Panel                          | LED pitch | PlatformIO env     |
 |:-----------------------------|:-------------------------------|:----------|:-------------------|
-| Waveshare ESP32-S3-LCD-3.16  | 3.16" ST7701 RGB, 320×820      | 10 px     | `waveshare_lcd316` |
-| LilyGO T-Display-S3          | 1.9" ST7789V i8080, 170×320    | 4 px      | `tdisplay_s3`      |
+| [Waveshare ESP32-S3-LCD-3.16](https://www.waveshare.com/product/esp32-s3-lcd-3.16.htm) | 3.16" ST7701 RGB, 320×820 | 10 px | `waveshare_lcd316` |
+| [LilyGO T-Display-S3](https://lilygo.cc/en-us/products/t-display-s3) | 1.9" ST7789V i8080, 170×320 | 4 px | `tdisplay_s3` |
 
 Five clock modes, switched from the web UI on both boards or with the T-Display-S3's KEY button. WiFiManager handles captive-portal provisioning; ezTime handles NTP sync with Olson timezone and DST.
+
+[Board photos and links](#hardware) · [Clock mode screenshots](#clock-modes) · [Web UI screenshots](#web-ui) · [USB installer](https://anthonyjclarke.github.io/ESP32-S3-LCD-PongClock/)
 
 ## Install directly from your browser
 
@@ -37,6 +39,8 @@ Check the board model yourself: both report the same ESP32-S3 chip, so automatic
 
 Use desktop **Chrome or Edge**, a USB data cable, and close serial monitors. Hold **BOOT**, press and release **RST**, then release **BOOT** before selecting the USB port. The installer writes firmware **and LittleFS web assets**, checks download and flash integrity, and uses the ROM bootloader at 115200 baud without a stub. Press **RST** after installation.
 
+Wait for the green **“Installation completed”** banner with a checkmark. It appears only after all files have been written and verified; reaching 100% on the progress bar alone does not mean verification has finished. Then press **RST** on your board to start the clock.
+
 Installing replaces firmware and web files. With the existing PongClock partition layout, NVS WiFi and clock settings are retained; changing `FW_VERSION` still resets the clock mode to its default. On first boot, join `ESP32-S3-PongClock`, configure WiFi through its captive portal (`192.168.4.1` if it does not open automatically), then open the IP address displayed by the clock.
 
 The installer implementation is ready for board testing; physical browser flashing on both boards has not yet been verified. The link becomes available after the Pages workflow is deployed. See [publishing the installer](#publishing-the-github-pages-installer) below and use [Build and Flash](#build-and-flash) as the command-line alternative.
@@ -46,6 +50,12 @@ The installer implementation is ready for board testing; physical browser flashi
 ## Hardware
 
 ### Waveshare ESP32-S3-LCD-3.16
+
+<a href="https://www.waveshare.com/product/esp32-s3-lcd-3.16.htm"><img src="docs/assets/board-waveshare.jpg" alt="Waveshare ESP32-S3-LCD-3.16 board with its long 3.16-inch LCD" width="360"></a>
+
+[Official product / purchase page](https://www.waveshare.com/product/esp32-s3-lcd-3.16.htm) · [Waveshare wiki, schematics and pinout](https://www.waveshare.com/wiki/ESP32-S3-LCD-3.16)
+
+*Manufacturer photo, courtesy of Waveshare. The displayed image is a manufacturer demo.*
 
 | Feature    | Detail                                    |
 |:-----------|:------------------------------------------|
@@ -60,6 +70,12 @@ The installer implementation is ready for board testing; physical browser flashi
 | Serial     | USB CDC (native USB port)                 |
 
 ### LilyGO T-Display-S3
+
+<a href="https://lilygo.cc/en-us/products/t-display-s3"><img src="docs/assets/board-tdisplay-s3.jpg" alt="LilyGO T-Display-S3 front and rear, showing its 1.9-inch LCD, USB-C connector and two buttons" width="360"></a>
+
+[Official product / purchase page](https://lilygo.cc/en-us/products/t-display-s3) · [LilyGO board documentation](https://wiki.lilygo.cc/products/t-display-series/t-display-s3/) · [Manufacturer examples, schematic and pinout](https://github.com/Xinyuan-LilyGO/T-Display-S3)
+
+*Manufacturer photo, courtesy of LilyGO. The displayed clock is a manufacturer demo.* Choose the **1.9″ ST7789 T-Display-S3**; AMOLED and Pro models use different displays.
 
 | Feature    | Detail                                       |
 |:-----------|:---------------------------------------------|
@@ -87,6 +103,18 @@ The grid is drawn at 4 px/LED (320×128) centred with 21 px margins top and bott
 | 2 | Digits     | Large digit display with morphing transitions    |
 | 3 | Word Clock | Time spelled out in words on the LED grid        |
 | 4 | Invaders   | Space Invaders sprites animate the current time  |
+
+### Example clock screens
+
+Captured from the project's actual `data/clock.js` browser preview using example time and settings. Both boards use the same 80×32 grid; the physical size and LED pitch differ. These are browser screenshots, not photographs or framebuffer captures from a connected board. A still image shows one frame of each animation.
+
+| Slide | Pong |
+|:------|:-----|
+| ![Slide mode: hours, minutes and seconds above the date](docs/assets/mode-slide.png) | ![Pong mode: time as the score, with paddles and a ball](docs/assets/mode-pong.png) |
+| **Digits** | **Word Clock** |
+| ![Digits mode: large hours and minutes with a blinking colon](docs/assets/mode-digits.png) | ![Word Clock mode: time spelled out in words](docs/assets/mode-word.png) |
+| **Invaders** | |
+| ![Invaders mode: time, animated alien and date row](docs/assets/mode-invaders.png) | |
 
 ### Controls
 
@@ -128,6 +156,24 @@ Once connected to WiFi, the board serves a single-page app on port 80. Open `htt
 | `/screenshot.bmp` | GET      | Current TFT frame as a BMP snapshot          |
 
 The IP address is printed on the display after WiFi connects and is also logged to serial. If the board cannot find a saved network it opens a captive portal AP named `ESP32-S3-PongClock`.
+
+### Example web UI screens
+
+These screenshots use the actual HTML, CSS and JavaScript in `data/`, with sample API responses. `Example WiFi`, the IP address, MAC, memory readings and build time are illustrative values. The PCB drawing is part of the web UI.
+
+**Clock tab — Waveshare:** live Pong preview, mode selector and Device panel. The decorative button is hidden because this board has no clock-control button.
+
+<img src="docs/assets/webui-waveshare.png" alt="Waveshare Clock tab with live Pong preview, all five mode buttons and example device information" width="760">
+
+**Clock tab — LilyGO:** the same controls with T-Display-S3 identity and its GPIO14 button shown.
+
+<img src="docs/assets/webui-lilygo.png" alt="LilyGO T-Display-S3 Clock tab showing its board name, GPIO14 control and example device information" width="760">
+
+**Config tab:** time format, date interval, brightness, LED colours, timezone, NTP server, WiFi reset, API information and screenshot download.
+
+<img src="docs/assets/webui-config.png" alt="Config tab showing clock, display, timezone and WiFi settings, plus Save Settings, API Info and Screenshot actions" width="760">
+
+To capture a real board's display, open `http://<ip-address>/screenshot.bmp` or use **Config → Screenshot**. This downloads the LED-grid sprite as a BMP (800×320 on Waveshare, 320×128 on LilyGO), excluding the physical board and display margins. To refresh the example screenshots after changing the web UI, see [screenshot sources and regeneration](docs/assets/README.md).
 
 ### Device panel
 

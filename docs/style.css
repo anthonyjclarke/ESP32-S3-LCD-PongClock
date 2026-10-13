@@ -19,5 +19,17 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 input { margin-right: 8px; }
 li { margin: 10px 0; }
 progress { width: 100%; accent-color: #ffc16b; }
+.completion { display: flex; align-items: flex-start; gap: 18px; padding: 24px; margin: 18px 0; background: #123322; border: 2px solid #6de6a0; border-radius: 12px; color: #e5fff0; }
+.completion[hidden] { display: none; }
+.completion-icon { font-size: 2.8rem; line-height: 1; color: #6de6a0; }
+.completion h3 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.2; margin: 0 0 12px; }
+.completion p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.completion-next { font-size: 1.15rem; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; font-size: 0.85rem; background: #090c0e; padding: 16px; }
 footer { margin-top: 44px; }
+.board-photo { width: 100%; height: 210px; object-fit: contain; display: block; background: #fff; border-radius: 6px; margin-bottom: 20px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+figure { margin: 0; min-width: 0; }
+figure img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid #46525b; box-sizing: border-box; }
+figcaption { color: #b8c1c8; font-size: 0.9rem; margin: 10px 0; }
+.webui-gallery img { background: #111; }
