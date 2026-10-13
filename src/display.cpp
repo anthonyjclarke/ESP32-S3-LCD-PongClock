@@ -15,6 +15,7 @@ static uint16_t colourOff = 0;
 
 bool ledColourChanged = false;
 
+#if defined(BOARD_WAVESHARE_LCD316)
 // ── Backlight (ESP-IDF LEDC, channel 1, timer 3, inverted) ───────────────────
 void initBacklight(uint8_t brightness) {
   ledc_timer_config_t timer_conf = {
@@ -46,14 +47,64 @@ void setBacklightBrightness(uint8_t brightness) {
                    static_cast<ledc_channel_t>(cfg::kBacklightPwmChannel));
 }
 
+#elif defined(BOARD_TDISPLAY_S3)
+// ── Backlight (pulse-count dimming, 16 levels) ───────────────────────────────
+// The backlight LED driver is not PWM-dimmed: it powers up at full brightness
+// and every low pulse on its enable pin steps it down one level, wrapping from
+// the dimmest back to the brightest. Holding the pin low for >2.5 ms turns it
+// off. Same scheme as LilyGO's factory example; 0–255 maps onto 0–16.
+static uint8_t blLevel = 0;  // 0 = off, kBacklightLevels = full
+
+void setBacklightBrightness(uint8_t brightness) {
+  const uint8_t steps  = cfg::kBacklightLevels;
+  const uint8_t target = (uint8_t)(((uint16_t)brightness * steps + 254) / 255);  // non-zero → ≥ 1
+
+  if (target == blLevel) return;
+  if (target == 0) {
+    digitalWrite(cfg::kPinBacklight, LOW);
+    delay(3);
+    blLevel = 0;
+    return;
+  }
+  if (blLevel == 0) {
+    digitalWrite(cfg::kPinBacklight, HIGH);  // wakes at full brightness
+    delayMicroseconds(30);
+    blLevel = steps;
+  }
+  // Each pulse lowers the level by one (wrapping), so count forward from the
+  // current level to the target modulo the number of levels.
+  uint8_t pulses = (uint8_t)((blLevel - target + steps) % steps);
+  for (uint8_t i = 0; i < pulses; i++) {
+    digitalWrite(cfg::kPinBacklight, LOW);
+    delayMicroseconds(1);
+    digitalWrite(cfg::kPinBacklight, HIGH);
+    delayMicroseconds(1);
+  }
+  blLevel = target;
+}
+
+void initBacklight(uint8_t brightness) {
+  // Panel power rail — without it the display stays dark on battery.
+  pinMode(cfg::kPinPowerOn, OUTPUT);
+  digitalWrite(cfg::kPinPowerOn, HIGH);
+
+  pinMode(cfg::kPinBacklight, OUTPUT);
+  digitalWrite(cfg::kPinBacklight, LOW);
+  delay(3);  // guarantee the driver is fully off before the first level is set
+  blLevel = 0;
+  setBacklightBrightness(brightness);
+}
+#endif
+
 // ── Colour + sprite init ──────────────────────────────────────────────────────
 void initColours() {
   colourOn  = gfx.color565(COLOUR_LED_ON_R,  COLOUR_LED_ON_G,  COLOUR_LED_ON_B);
   colourOff = gfx.color565(COLOUR_LED_OFF_R, COLOUR_LED_OFF_G, COLOUR_LED_OFF_B);
 
-  // 8-bit depth (RGB332): 800×320 = 256 KB.
-  // Try DMA-capable internal RAM first (faster, less PSRAM bus pressure).
-  // Fall back to PSRAM if internal heap is fragmented (e.g. after a crash reset).
+  // 8-bit depth (RGB332): 800×320 = 256 KB on Waveshare, 320×128 = 40 KB on T-Display-S3.
+  // Try DMA-capable internal RAM first (faster, less PSRAM bus pressure), then PSRAM.
+  // Waveshare always lands in PSRAM: on core 3.3.7 the largest internal block is
+  // ~250 KB from the first line of setup(), short of 256 KB. T-Display-S3 fits internally.
   matrixSprite.setColorDepth(8);
   void* buf = matrixSprite.createSprite(LED_WIDTH * PIXEL_SIZE, LED_HEIGHT * PIXEL_SIZE);
   if (!buf) {
@@ -69,7 +120,7 @@ void initColours() {
   }
   matrixSprite.fillSprite(colourOff);
 
-  // Background colour for the 10 px margins (left and right of the LED grid)
+  // Background colour for the margins around the LED grid
   gfx.fillScreen(gfx.color565(5, 2, 0));
 }
 
@@ -80,7 +131,11 @@ void plot(int x, int y, bool on) {
   uint16_t colour = on ? colourOn : colourOff;
   int px = x * PIXEL_SIZE + PIXEL_MARGIN;
   int py = y * PIXEL_SIZE + PIXEL_MARGIN;
-  matrixSprite.fillRoundRect(px, py, PIXEL_INNER, PIXEL_INNER, 1, colour);
+#if PIXEL_RADIUS > 0
+  matrixSprite.fillRoundRect(px, py, PIXEL_INNER, PIXEL_INNER, PIXEL_RADIUS, colour);
+#else
+  matrixSprite.fillRect(px, py, PIXEL_INNER, PIXEL_INNER, colour);
+#endif
 }
 
 void pushMatrix() {

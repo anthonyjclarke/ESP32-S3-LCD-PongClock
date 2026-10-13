@@ -1,6 +1,6 @@
 #pragma once
-// waveshare_display.h — WaveshareDisplay hardware class and global display instance.
-// Include this wherever access to `gfx` or backlight control is needed.
+// waveshare_display.h — WaveshareDisplay hardware class (ST7701 RGB panel).
+// Do not include directly — include board_display.h, which picks the board.
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
@@ -142,11 +142,3 @@ class WaveshareDisplay : public lgfx::LGFX_Device {
   lgfx::Bus_RGB    bus_;
   WavesharePanel   panel_;
 };
-
-// Global display instance — defined in main.cpp
-extern WaveshareDisplay gfx;
-
-// ── Backlight control ─────────────────────────────────────────────────────────
-// Uses ESP-IDF LEDC channel 1, timer 3. Inverted: duty 0 = full brightness.
-void initBacklight(uint8_t brightness);
-void setBacklightBrightness(uint8_t brightness);

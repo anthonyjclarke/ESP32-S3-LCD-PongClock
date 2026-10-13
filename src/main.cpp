@@ -1,17 +1,18 @@
 #include <Arduino.h>
 #include <WiFiManager.h>
 #include <ezTime.h>
-#include "waveshare_display.h"
+#include "board_display.h"
 #include "config.h"
 #include "config_nvs.h"
 #include "debug.h"
 #include "display.h"
 #include "clock.h"
 #include "web.h"
+#include "sysinfo.h"
 
 // ── Global display instance ───────────────────────────────────────────────────
-// Defined here; declared extern in waveshare_display.h.
-WaveshareDisplay gfx;
+// Defined here; declared extern in board_display.h.
+BoardDisplay gfx;
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 static void drawLedBorder() {
@@ -65,12 +66,11 @@ static void showSplash() {
 }
 
 // ── Boot status lines (drawn directly on the display, overlaying the sprite) ───
-// The sprite exactly fills the 820×320 landscape display (800×320 at x+10),
-// so there is no physical footer margin. These are temporary — overwritten
-// the moment the clock mode loop calls cls()/pushMatrix().
+// Line positions are per board (cfg::kStatusLineY / kIpLineY). On Waveshare
+// they overlay the bottom of the LED grid and are overwritten by the first
+// clock frame; on T-Display-S3 they sit in the margins and stay until the
+// next fillScreen().
 // Font2 char dimensions: ~6 px wide, ~14 px tall at textSize 1.
-static constexpr int16_t kStatusLineY  = 290;
-static constexpr int16_t kIpLineY      = 305;
 static constexpr uint16_t kBootIpHoldMs = 2500;
 
 static void showFooterLine(int16_t y, const char* msg) {
@@ -82,8 +82,8 @@ static void showFooterLine(int16_t y, const char* msg) {
   gfx.drawString(msg, x > 0 ? x : 0, y);
 }
 
-static void showStatus(const char* msg)  { showFooterLine(kStatusLineY, msg); }
-static void showIpLine(const char* msg)  { showFooterLine(kIpLineY,     msg); }
+static void showStatus(const char* msg)  { showFooterLine(cfg::kStatusLineY, msg); }
+static void showIpLine(const char* msg)  { showFooterLine(cfg::kIpLineY,     msg); }
 
 // ── Boot IP display on the LED matrix canvas ───────────────────────────────────
 // Shows "IP" in 5×7 font (centred) and the IP string in 3×5 tiny font below.
@@ -120,7 +120,10 @@ static void showBootIpOnMatrix(const char* ip) {
 static void initWiFi() {
   showStatus("Connecting WiFi...");
   WiFiManager wm;
-  bool hasSavedWifi = WiFi.SSID().length() > 0;
+  // WiFi.SSID() is only the joined network, so it is empty before autoConnect.
+  // getWiFiIsSaved() reads the stored STA config, which needs the driver started.
+  WiFi.mode(WIFI_STA);
+  bool hasSavedWifi = wm.getWiFiIsSaved();
   wm.setConfigPortalTimeout(hasSavedWifi ? WIFI_TIMEOUT_S : 0);
   DBG_INFO("WiFiManager portal timeout: %d s (%s credentials)",
            hasSavedWifi ? WIFI_TIMEOUT_S : 0,
@@ -144,14 +147,17 @@ static void initWiFi() {
 // ── Time init ─────────────────────────────────────────────────────────────────
 static void initTime() {
   showStatus("Syncing NTP...");
+  setServer(rtCfg.ntpServer);
   waitForSync(NTP_SYNC_TIMEOUT_S);
 
   if (timeStatus() == timeNotSet) {
     DBG_WARN("Time: NTP sync failed — clock will show 0");
   }
 
-  if (!myTZ.setLocation(F(NTP_TIMEZONE))) {
-    DBG_WARN("Time: Olson lookup failed — applying POSIX fallback: %s", NTP_POSIX_FALLBACK);
+  // Saved timezone (web UI) — NTP_TIMEZONE is only the first-boot default.
+  if (!myTZ.setLocation(rtCfg.timezone)) {
+    DBG_WARN("Time: Olson lookup failed for %s — applying POSIX fallback: %s",
+             rtCfg.timezone, NTP_POSIX_FALLBACK);
     myTZ.setPosix(NTP_POSIX_FALLBACK);
   }
 
@@ -166,7 +172,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);  // wait for USB CDC enumeration
 
-  DBG_INFO("=== ESP32-S3 PongClock %s starting ===", FW_VERSION);
+  printBootBanner();
 
   // Load NVS config first — values used during display init below
   loadConfig();
@@ -175,13 +181,13 @@ void setup() {
   initBacklight(0);
   delay(20);
 
-  // Display: landscape rotation (logical 820×320)
+  // Display: landscape rotation (820×320 Waveshare, 320×170 T-Display-S3)
   gfx.init();
-  gfx.setRotation(1);
+  gfx.setRotation(cfg::kRotation);
   gfx.setColorDepth(16);
   gfx.fillScreen(0);
 
-  // Sprite + colour init — allocates 800×320 8-bit sprite in PSRAM
+  // Sprite + colour init — 8-bit LED-grid sprite, internal RAM first
   initColours();
   clsNow();
 
@@ -196,10 +202,21 @@ void setup() {
 
   showSplash();
 
+  // Identify board / firmware / build date on screen while WiFi connects —
+  // the IP line is overwritten once an address is assigned. Font2 is ASCII-only.
+  char idLine[80];
+  snprintf(idLine, sizeof(idLine), "%s  v%s  %.10s", BOARD_NAME, FW_VERSION, buildTimestamp());
+  showIpLine(idLine);
+
   initButton();
   initWiFi();
   initTime();
   initWeb();
+
+  // Clear boot status lines — on T-Display-S3 they sit in the margins, which
+  // the clock frames never repaint.
+  showStatus("");
+  showIpLine("");
 
   // Seed RNG — ADC on any floating pin gives good entropy on ESP32-S3
   randomSeed(esp_random());

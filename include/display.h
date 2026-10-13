@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include "waveshare_display.h"
+#include "board_display.h"
 
 // ── Sprite ────────────────────────────────────────────────────────────────────
 extern lgfx::LGFX_Sprite matrixSprite;

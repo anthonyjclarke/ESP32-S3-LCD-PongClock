@@ -27,7 +27,7 @@
   <section id="tab-clock" class="tab-panel active">
 
     <div class="pcb">
-      <div class="pcb-id">Waveshare ESP32-S3-LCD-3.16 &nbsp;&middot;&nbsp; ST7701 820&times;320</div>
+      <div class="pcb-id" id="pcbId">ESP32-S3 PongClock</div>
       <div class="bezel">
         <div class="screen">
           <canvas id="ledCanvas" width="800" height="320"></canvas>
@@ -53,6 +53,14 @@
       <button class="mode-pill" data-mode="invaders">Invaders</button>
     </div>
 
+    <!-- Device identity — filled from /api/info by clock.js -->
+    <div class="device-card">
+      <p class="form-section-title">Device</p>
+      <dl class="device-grid" id="deviceInfo">
+        <dt>Board</dt><dd>Loading…</dd>
+      </dl>
+    </div>
+
   </section>
 
   <!-- ── Config tab ─────────────────────────────────────────────────────── -->
@@ -71,7 +79,7 @@
           </div>
           <div class="form-row">
             <label>Date interval</label>
-            <input type="number" id="cfg-date-interval" min="1" max="60" value="10">
+            <input type="number" id="cfg-date-interval" min="1" max="59" value="10">
             <span style="font-size:11px;color:#666">min</span>
           </div>
         </div>

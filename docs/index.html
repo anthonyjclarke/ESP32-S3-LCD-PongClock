@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install PongClock directly over USB on Waveshare ESP32-S3-LCD-3.16 or LilyGO T-Display-S3.">
+  <title>PongClock · USB installer</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="installer.js"></script>
+</head>
+<body>
+<main>
+  <p class="eyebrow">ESP32-S3 · FIVE CLOCK MODES</p>
+  <h1>PongClock</h1>
+  <p class="intro">Install the clock straight from your browser. Firmware and the device’s web interface are included.</p>
+  <p><a href="https://github.com/anthonyjclarke/ESP32-S3-LCD-PongClock">Code, hardware details &amp; build instructions ↗</a></p>
+  <section aria-labelledby="choose-heading">
+    <h2 id="choose-heading">Choose your board</h2>
+    <p>Check the name printed on your board. Both use an ESP32-S3, so the browser cannot distinguish their displays. Choosing the wrong firmware can leave the screen blank.</p>
+    <div class="boards">
+      <article>
+        <h3>Waveshare ESP32-S3-LCD-3.16</h3>
+        <p>3.16″ · 320 × 820 · ST7701 RGB display<br>16 MB flash · 8 MB PSRAM<br>Clock controls: web interface</p>
+        <button type="button" data-board="waveshare_lcd316" disabled>Install on Waveshare 3.16</button>
+      </article>
+      <article>
+        <h3>LilyGO T-Display-S3</h3>
+        <p>1.9″ · 170 × 320 · ST7789 display<br>16 MB flash · 8 MB PSRAM<br>Clock controls: KEY button + web interface</p>
+        <button type="button" data-board="tdisplay_s3" disabled>Install on T-Display-S3</button>
+      </article>
+    </div>
+    <p class="note">For these two boards only. Other Waveshare displays, the original T-Display, T-Display-S3 AMOLED and T-Display-S3 Pro need different firmware. Touch input is not supported.</p>
+    <label class="confirm"><input type="checkbox" id="confirm"> I have checked my board model and understand this replaces its firmware and web files. WiFi and clock settings are retained with the existing PongClock partition layout.</label>
+  </section>
+  <section aria-labelledby="steps-heading">
+    <h2 id="steps-heading">Before you install</h2>
+    <ol>
+      <li>Use desktop Chrome or Edge and a USB data cable. Close serial monitors.</li>
+      <li>Enter download mode: hold <strong>BOOT</strong>, press and release <strong>RST</strong>, then release <strong>BOOT</strong>.</li>
+      <li>Click the button for your board and select its USB serial port. Keep the cable connected until installation finishes; this may take several minutes.</li>
+      <li>Press <strong>RST</strong> after installation. On first use, join <strong>ESP32-S3-PongClock</strong> and configure your WiFi in its captive portal (or open <strong>192.168.4.1</strong>).</li>
+      <li>The clock shows its WiFi IP address at startup. Open that address to choose a mode, brightness and timezone.</li>
+    </ol>
+    <p>If a transfer fails, enter download mode again and retry. The <a href="https://github.com/anthonyjclarke/ESP32-S3-LCD-PongClock#build-and-flash">PlatformIO instructions</a> provide an alternative.</p>
+  </section>
+  <section aria-labelledby="status-heading">
+    <h2 id="status-heading">Installation</h2>
+    <p id="status" role="status" aria-live="polite">Loading installer…</p>
+    <progress id="progress" value="0" max="100" aria-label="Installation progress"></progress>
+    <details><summary>Installation log</summary><pre id="log"></pre></details>
+    <noscript>Enable JavaScript to install, or use the PlatformIO instructions linked above.</noscript>
+  </section>
+  <footer>Open source · MIT · Browser flashing powered by <a href="https://github.com/espressif/esptool-js">Espressif esptool-js</a></footer>
+</main>
+</body>
+</html>

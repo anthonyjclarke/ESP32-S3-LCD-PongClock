@@ -18,6 +18,7 @@ static bool     btnWasDown     = false;
 static bool     longFired      = false;
 static uint32_t lastPressMs    = 0;
 static uint8_t  brightnessStep = 0;
+static const uint8_t kBrightnessLevels[BRIGHTNESS_STEPS] = {60, 120, 180, 255};
 static byte     activeMode     = 255;
 
 static void beginModeLoop() {
@@ -25,7 +26,19 @@ static void beginModeLoop() {
 }
 
 void initButton() {
+  if (PIN_BUTTON < 0) {
+    DBG_INFO("No button on this board — control via web UI");
+    return;
+  }
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+
+  // Start the long-press cycle from the saved brightness, so the first press
+  // steps up from the current level instead of always jumping to 120. Below
+  // the lowest step, start at the top so the next press wraps to the lowest.
+  brightnessStep = BRIGHTNESS_STEPS - 1;
+  for (uint8_t i = 0; i < BRIGHTNESS_STEPS; i++) {
+    if (kBrightnessLevels[i] <= rtCfg.brightness) brightnessStep = i;
+  }
   DBG_INFO("Button initialised on GPIO%d", PIN_BUTTON);
 }
 
@@ -35,7 +48,7 @@ void initButton() {
 bool run_mode() {
   if (activeMode != 255 && clock_mode != activeMode) return false;
 
-  bool pressed = (digitalRead(PIN_BUTTON) == LOW);
+  bool pressed = (PIN_BUTTON >= 0) && (digitalRead(PIN_BUTTON) == LOW);
   uint32_t now = millis();
 
   if (pressed) {
@@ -45,12 +58,11 @@ bool run_mode() {
       btnDownMs  = now;
     } else if (!longFired && (now - btnDownMs) >= BUTTON_LONG_PRESS_MS) {
       longFired = true;
-      const uint8_t levels[BRIGHTNESS_STEPS] = {60, 120, 180, 255};
       brightnessStep = (brightnessStep + 1) % BRIGHTNESS_STEPS;
-      setBrightness(levels[brightnessStep]);
-      rtCfg.brightness = levels[brightnessStep];
+      setBrightness(kBrightnessLevels[brightnessStep]);
+      rtCfg.brightness = kBrightnessLevels[brightnessStep];
       saveConfig();
-      DBG_INFO("Long press: brightness step=%d pwm=%d", brightnessStep, levels[brightnessStep]);
+      DBG_INFO("Long press: brightness step=%d pwm=%d", brightnessStep, kBrightnessLevels[brightnessStep]);
     }
   } else {
     // Release: let checkButton() detect the short tap via btnWasDown flag
@@ -65,7 +77,7 @@ bool run_mode() {
 // Call once per mode loop iteration after run_mode().
 // Returns +1 (next mode) on short tap, 0 on no event.
 int8_t checkButton() {
-  if (!btnWasDown) return 0;           // nothing in progress
+  if (PIN_BUTTON < 0 || !btnWasDown) return 0;  // no button, or nothing in progress
   if (digitalRead(PIN_BUTTON) == LOW)  return 0;  // still held
 
   // Button released
@@ -258,7 +270,7 @@ void slideanim(byte x, byte y, byte sequence, char old_c, char new_c) {
 // ── Date helpers ──────────────────────────────────────────────────────────────
 void set_next_date() {
   get_time();
-  next_display_date = (rtc[1] + DATE_DISPLAY_MINS) % 60;
+  next_display_date = (rtc[1] + rtCfg.dateInterval) % 60;  // 1–59, clamped on load/save
 }
 
 bool check_show_date() {

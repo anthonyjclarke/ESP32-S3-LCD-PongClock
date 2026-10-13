@@ -192,6 +192,38 @@ main {
 .mode-pill:hover  { border-color: #c8a000; color: #c8a000; }
 .mode-pill.active { background: #2a2200; border-color: #c8a000; color: #c8a000; }
 
+/* ── Device panel ────────────────────────────────────────────────────────────── */
+.device-card {
+  width: 100%;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.device-grid dt {
+  color: #666;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  align-self: center;
+}
+
+.device-grid dd {
+  margin: 0;
+  color: #ccc;
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
 /* ── Config tab ─────────────────────────────────────────────────────────────── */
 .config-form {
   width: 100%;
@@ -356,6 +388,8 @@ footer a:hover { color: #c8a000; }
   #ledCanvas { width: 300px; height: 120px; }
   .form-row  { flex-direction: column; align-items: flex-start; }
   .form-row label { width: auto; }
+  .device-grid { grid-template-columns: 1fr; gap: 2px; }
+  .device-grid dd { margin-bottom: 6px; }
   .logo-img  { height: 44px; }
   .logo-clock { font-size: 52px; }
 }
