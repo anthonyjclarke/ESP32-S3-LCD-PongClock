@@ -4,6 +4,8 @@
 #include "config.h"
 #include "config_nvs.h"
 #include "debug.h"
+#include "sysinfo.h"
+#include <esp_arduino_version.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
@@ -64,14 +66,14 @@ static void handleLogo()     { serveFile("/pong-logo.png","image/png"); }
 static void handleFavicon()  { server.send(204); }
 
 // ── /screenshot.bmp ───────────────────────────────────────────────────────────
-// Streams the matrixSprite buffer (800×320, 8-bit RGB332) as a 24-bit BMP.
-// BMP row size: 800 × 3 = 2400 bytes (already 4-byte aligned).
-// File size: 54-byte header + 2400 × 320 = 768,054 bytes.
+// Streams the matrixSprite buffer (8-bit RGB332) as a 24-bit BMP.
+// Waveshare: 800×320 → 768,054 bytes.  T-Display-S3: 320×128 → 122,934 bytes.
+// Row size W × 3 is 4-byte aligned for both (W is a multiple of 4).
 static void handleScreenshot() {
-  const int W        = LED_WIDTH  * PIXEL_SIZE;  // 800
-  const int H        = LED_HEIGHT * PIXEL_SIZE;  // 320
-  const int rowBytes = W * 3;                    // 2400
-  const int fileSize = 54 + rowBytes * H;        // 768,054
+  constexpr int W    = LED_WIDTH  * PIXEL_SIZE;
+  constexpr int H    = LED_HEIGHT * PIXEL_SIZE;
+  const int rowBytes = W * 3;
+  const int fileSize = 54 + rowBytes * H;
 
   uint8_t hdr[54] = {};
   hdr[0] = 'B';  hdr[1] = 'M';
@@ -94,7 +96,7 @@ static void handleScreenshot() {
   server.sendContent((const char*)hdr, 54);
 
   const uint8_t* px = (const uint8_t*)matrixSprite.getBuffer();
-  static uint8_t row[2400];  // static: 2400 bytes on heap not stack
+  static uint8_t row[W * 3];  // static: keeps the row buffer off the stack
   for (int y = 0; y < H; y++) {
     const uint8_t* src = px + y * W;
     for (int x = 0; x < W; x++) {
@@ -116,28 +118,45 @@ static const char* const MODE_NAMES[NUM_MODES] = {
   "Slide", "Pong", "Digits", "WordClock", "Invaders"
 };
 
+// Everything that identifies the device is here so the web UI's Device panel
+// and anything polling the API see the same facts as the serial boot banner.
+// ArduinoJson builds it so an SSID or hostname containing quotes stays valid.
 static void handleApiInfo() {
-  char buf[256];
-  snprintf(buf, sizeof(buf),
-    "{\"firmware\":\"%s\","
-    "\"mode\":%d,"
-    "\"modeName\":\"%s\","
-    "\"brightness\":%d,"
-    "\"uptime\":%lu,"
-    "\"freeHeap\":%u,"
-    "\"freePsram\":%u,"
-    "\"ip\":\"%s\"}",
-    FW_VERSION,
-    (int)clock_mode,
-    MODE_NAMES[clock_mode < NUM_MODES ? clock_mode : 0],
-    (int)currentBrightness,
-    millis() / 1000UL,
-    (unsigned)ESP.getFreeHeap(),
-    (unsigned)ESP.getFreePsram(),
-    WiFi.localIP().toString().c_str()
-  );
+  char mac[18], rev[8];
+  macString(mac, sizeof(mac));
+  chipRevString(rev, sizeof(rev));
+
+  StaticJsonDocument<1024> doc;
+  doc["firmware"]    = FW_VERSION;
+  doc["build"]       = buildTimestamp();
+  doc["board"]       = BOARD_NAME;
+  doc["panel"]       = PANEL_DESC;
+  doc["controls"]    = controlsDesc();
+  doc["button"]      = PIN_BUTTON;            // -1 = no button on this board
+  doc["chip"]        = ESP.getChipModel();
+  doc["chipRev"]     = rev;
+  doc["cpuMHz"]      = ESP.getCpuFreqMHz();
+  doc["flashMB"]     = ESP.getFlashChipSize() / (1024UL * 1024UL);
+  doc["psramMB"]     = ESP.getPsramSize()     / (1024UL * 1024UL);
+  doc["core"]        = ESP_ARDUINO_VERSION_STR;
+  doc["idf"]         = ESP.getSdkVersion();
+  doc["resetReason"] = resetReasonStr();
+  doc["mac"]         = mac;
+  doc["ip"]          = WiFi.localIP().toString();
+  doc["hostname"]    = WiFi.getHostname();
+  doc["ssid"]        = WiFi.SSID();
+  doc["rssi"]        = WiFi.RSSI();
+  doc["mode"]        = (int)clock_mode;
+  doc["modeName"]    = MODE_NAMES[clock_mode < NUM_MODES ? clock_mode : 0];
+  doc["brightness"]  = (int)currentBrightness;
+  doc["uptime"]      = millis() / 1000UL;
+  doc["freeHeap"]    = ESP.getFreeHeap();
+  doc["freePsram"]   = ESP.getFreePsram();
+
+  String out;
+  serializeJson(doc, out);
   server.sendHeader("Cache-Control", "no-cache");
-  server.send(200, "application/json", buf);
+  server.send(200, "application/json", out);
 }
 
 // ── /api/config GET ───────────────────────────────────────────────────────────
@@ -226,11 +245,13 @@ static void handleConfigPost() {
     const char* ntp = doc["ntpServer"].as<const char*>();
     if (ntp && strlen(ntp) < sizeof(rtCfg.ntpServer)) {
       strlcpy(rtCfg.ntpServer, ntp, sizeof(rtCfg.ntpServer));
+      setServer(rtCfg.ntpServer);  // used from the next NTP sync onwards
       changed = true;
     }
   }
   if (doc.containsKey("dateInterval")) {
-    rtCfg.dateInterval = doc["dateInterval"].as<uint8_t>();
+    int di = doc["dateInterval"].as<int>();
+    rtCfg.dateInterval = (uint8_t)constrain(di, 1, 59);
     changed = true;
   }
 

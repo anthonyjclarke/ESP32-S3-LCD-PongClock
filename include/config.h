@@ -3,14 +3,26 @@
 #include <Arduino.h>
 
 // ── Firmware ──────────────────────────────────────────────────────────────────
-#define FW_VERSION        "2.0.6"
+#define FW_VERSION        "2.1.0"
 #define FIRMWARE_VERSION  FW_VERSION   // alias for badge/display use
 
-// ── Hardware pins (Waveshare ESP32-S3-LCD-3.16) ───────────────────────────────
+// ── Board selection ───────────────────────────────────────────────────────────
+// Set by the PlatformIO env (-DBOARD_xxx). Everything board-specific lives in
+// the two blocks below; clock modes only ever see the 80×32 LED grid.
+#if defined(BOARD_WAVESHARE_LCD316) == defined(BOARD_TDISPLAY_S3)
+#error "Define exactly one of BOARD_WAVESHARE_LCD316 or BOARD_TDISPLAY_S3"
+#endif
+
+#if defined(BOARD_WAVESHARE_LCD316)
+// ── Waveshare ESP32-S3-LCD-3.16 — ST7701 RGB parallel, 320×820 ───────────────
+#define BOARD_NAME "Waveshare ESP32-S3-LCD-3.16"
+#define PANEL_DESC "ST7701 820×320"
+
 namespace cfg {
 
 constexpr int kScreenWidth  = 320;
 constexpr int kScreenHeight = 820;
+constexpr uint8_t kRotation = 1;   // landscape: logical 820×320
 
 constexpr int kPinBacklight = 6;
 
@@ -45,9 +57,6 @@ constexpr int kPinB4 = 47;
 
 constexpr uint32_t kRgbClockHz = 14000000;
 
-constexpr uint8_t  kBacklightDefaultBrightness = 255;
-constexpr uint8_t  kBacklightMinBrightness     = 0;
-constexpr uint8_t  kBacklightMaxBrightness     = 255;
 constexpr uint32_t kBacklightPwmHz             = 50000;
 constexpr uint8_t  kBacklightPwmResolution     = 8;
 constexpr uint8_t  kBacklightPwmChannel        = 1;
@@ -56,24 +65,88 @@ inline uint32_t backlightDutyFromBrightness(uint8_t brightness) {
   return 0xFFu - brightness;  // inverted: duty 0 = full brightness
 }
 
+// Boot status lines — no physical margin, so these overlay the bottom of the
+// LED grid until the first clock frame repaints it.
+constexpr int16_t kStatusLineY = 290;
+constexpr int16_t kIpLineY     = 305;
+
 }  // namespace cfg
 
-// ── Button ────────────────────────────────────────────────────────────────────
-#define PIN_BUTTON              4     // tactile button, wired to GND (INPUT_PULLUP)
+// No user button and no touch panel on this board: control is web UI only.
+// GPIO4 is the battery ADC (ADC1 CH3, per Waveshare's ADC demo) — never use
+// it as a button. BOOT is GPIO0, which is also the LCD command CS.
+#define PIN_BUTTON              -1
+
+// 80×32 grid at 10 px/LED = 800×320 sprite; 10 px margins left/right
+#define PIXEL_SIZE              10
+#define PIXEL_INNER             8     // filled inner rect (1 px gap each side in 10 px cell)
+#define PIXEL_MARGIN            1
+#define PIXEL_RADIUS            1     // rounded LED corners
+#define LED_X_OFFSET            10    // (820 - 800) / 2 = 10
+#define LED_Y_OFFSET            0     // 320 - 320 = 0 (exact vertical fill)
+
+#elif defined(BOARD_TDISPLAY_S3)
+// ── LilyGO T-Display-S3 — ST7789V 8-bit i8080 parallel, 170×320 ──────────────
+#define BOARD_NAME "LilyGO T-Display-S3"
+#define PANEL_DESC "ST7789 320×170"
+
+namespace cfg {
+
+constexpr int kScreenWidth  = 170;
+constexpr int kScreenHeight = 320;
+constexpr int kPanelOffsetX = 35;  // 170-wide glass centred in 240-wide ST7789 RAM
+constexpr uint8_t kRotation = 1;   // landscape: logical 320×170
+
+constexpr int kPinPowerOn   = 15;  // must be HIGH or the panel is dark on battery
+constexpr int kPinBacklight = 38;  // pulse-count dimming, 16 levels (LilyGO factory example)
+constexpr uint8_t kBacklightLevels = 16;
+
+constexpr int kPinLcdCs    = 6;
+constexpr int kPinLcdDc    = 7;
+constexpr int kPinLcdWr    = 8;
+constexpr int kPinLcdRd    = 9;
+constexpr int kPinLcdReset = 5;
+
+constexpr int kPinD0 = 39;
+constexpr int kPinD1 = 40;
+constexpr int kPinD2 = 41;
+constexpr int kPinD3 = 42;
+constexpr int kPinD4 = 45;
+constexpr int kPinD5 = 46;
+constexpr int kPinD6 = 47;
+constexpr int kPinD7 = 48;
+
+constexpr uint32_t kBusWriteHz = 20000000;
+
+// Boot status lines sit in the 21 px margins above and below the LED grid.
+constexpr int16_t kStatusLineY = 2;
+constexpr int16_t kIpLineY     = 152;
+
+}  // namespace cfg
+
+#define PIN_BUTTON              14    // on-board KEY button; same role as Waveshare GPIO4.
+                                      // GPIO4 is battery sense here — never use it. BOOT (GPIO0) unused.
+
+// 80×32 grid at 4 px/LED = 320×128 sprite; 21 px margins top/bottom
+#define PIXEL_SIZE              4
+#define PIXEL_INNER             3     // 3 px LED + 1 px gap
+#define PIXEL_MARGIN            0
+#define PIXEL_RADIUS            0     // square: a 1 px radius on 3 px reads as a blob
+#define LED_X_OFFSET            0
+#define LED_Y_OFFSET            21    // (170 - 128) / 2
+
+#endif
+
+// ── Button (PIN_BUTTON is per board, above; -1 = no button) ────────────────────
+// Short press = next mode, long press = brightness step, on boards that have one.
 #define BUTTON_LONG_PRESS_MS    600   // hold ≥ 600 ms → brightness cycle
 #define BUTTON_DEBOUNCE_MS      300   // minimum ms between registered presses
 #define BRIGHTNESS_STEPS        4     // 4-step cycle: 60/120/180/255
 
 // ── LED matrix ────────────────────────────────────────────────────────────────
-// Physical display: 320×820 portrait → setRotation(1) → logical 820×320
-// 80×32 grid at 10 px/LED = 800×320 sprite; 10 px margins left/right
+// Grid size is fixed for every board — clock-mode layouts are hand-placed on it.
 #define LED_WIDTH               80
 #define LED_HEIGHT              32
-#define PIXEL_SIZE              10
-#define PIXEL_INNER             8     // filled inner rect (1 px gap each side in 10 px cell)
-#define PIXEL_MARGIN            1
-#define LED_X_OFFSET            10    // (820 - 800) / 2 = 10
-#define LED_Y_OFFSET            0     // 320 - 320 = 0 (exact vertical fill)
 
 // ── Clock modes ───────────────────────────────────────────────────────────────
 #define NUM_MODES               5     // 0=Slide 1=Pong 2=Digits 3=WordClock 4=Invaders
@@ -114,7 +187,7 @@ inline uint32_t backlightDutyFromBrightness(uint8_t brightness) {
 
 // ── WiFi ─────────────────────────────────────────────────────────────────────
 #define WIFI_AP_NAME            "ESP32-S3-PongClock"
-#define WIFI_TIMEOUT_S          60    // captive-portal auto-close timeout
+#define WIFI_TIMEOUT_S          60    // portal auto-close when saved WiFi is unreachable
 
 // ── NTP / time ───────────────────────────────────────────────────────────────
 #define NTP_TIMEZONE            "Australia/Sydney"

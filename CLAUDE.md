@@ -1,90 +1,70 @@
-# CLAUDE.md — ESP32-S3-LCD-3.16
+# Project: ESP32-S3-LCD-PongClock
+
+Five-mode digital clock (Slide, Pong, Digits, Word Clock, Invaders) rendering an 80×32 virtual LED grid. One firmware, two boards selected at build time: Waveshare ESP32-S3-LCD-3.16 (`-e waveshare_lcd316`) and LilyGO T-Display-S3 (`-e tdisplay_s3`). WiFiManager + ezTime NTP, LittleFS web UI with live canvas preview and Device panel; T-Display-S3 also has a mode/brightness button. v2.1.0.
 
 ## Target Hardware
 
-**Waveshare ESP32-S3-LCD-3.16**
-- MCU: ESP32-S3R8 · dual-core 240 MHz
-- Flash: 16 MB
-- PSRAM: 8 MB octal OPI (mapped via `qio_opi`)
-- Display: 3.16" · 320 × 820 · ST7701 · RGB parallel bus (not SPI)
-- Serial: USB CDC on native USB port (`-DARDUINO_USB_CDC_ON_BOOT=1`)
+Both boards: ESP32-S3R8, 16 MB flash, 8 MB OPI PSRAM (`qio_opi`), native USB CDC (port varies — `ls /dev/cu.usbmodem*`).
 
-## What This Project Does
+| Board            | Panel                          | LED pitch | Sprite            |
+|:-----------------|:-------------------------------|:----------|:------------------|
+| Waveshare 3.16   | ST7701 RGB parallel, 320×820   | 10 px     | 800×320, 256 KB   |
+| T-Display-S3     | ST7789V 8-bit i8080, 170×320   | 4 px      | 320×128, 40 KB    |
 
-PongClock port for the Waveshare ESP32-S3-LCD-3.16. Drives the ST7701 RGB panel in landscape mode (`setRotation(1)`, logical 820×320) with an 80×32 virtual LED grid at 10 px/LED (800×320 sprite). Five clock modes: Slide, Pong, Digits, Word Clock, Invaders. WiFiManager provisioning, ezTime NTP sync, GPIO4 tactile button for mode/brightness control, and a LittleFS-served web UI with live canvas preview. After WiFi connects, the assigned IP address is displayed on the LED matrix canvas for 2.5 s before the clock starts.
+## Board Abstraction
 
-## Non-Obvious Pin Assignments
+- `-DBOARD_WAVESHARE_LCD316` / `-DBOARD_TDISPLAY_S3` come from the env; `config.h` `#error`s unless exactly one is set.
+- Everything board-specific is in the two `#if` blocks in `config.h`, the panel classes, and the backlight functions in `display.cpp`. Include `board_display.h`, never a panel header directly.
+- `LED_WIDTH`/`LED_HEIGHT` (80×32) are fixed: clock-mode layouts are hand-placed on that grid. A new board scales `PIXEL_SIZE`, never the grid.
+- No touch on either board (T-Display-S3 touch variant's controller unused). Waveshare has no user button at all: `PIN_BUTTON -1` skips button handling, web UI only. T-Display-S3 uses KEY on GPIO14. Button code in `clock.cpp` checks `PIN_BUTTON < 0` — keep that guard.
+- GPIO4 is battery ADC on **both** boards (Waveshare: ADC1 CH3). Never configure it as an input/button.
+- Device identity lives in `sysinfo.cpp` and feeds the serial boot banner, the on-screen boot line and `/api/info`. Add new identity fields there, not inline. Build time is `__DATE__`/`__TIME__` of `sysinfo.cpp` — refreshes only when it recompiles (it includes `config.h`).
 
-- **Backlight**: GPIO6, inverted LEDC PWM — duty 0 = full brightness, 255 = off. This is opposite to typical active-high setups.
-- **LCD command interface**: GPIO0 (CS), GPIO1 (MOSI), GPIO2 (SCK), GPIO16 (RST) — this is a sideband SPI interface for ST7701 init commands, separate from the RGB pixel data bus.
-- **RGB bus**: 16-bit parallel across GPIOs 3, 5, 8–14, 17–18, 21, 45–48 — see `config.h` for full pin mapping.
-- **USB CDC**: Serial routes over native USB, not CP2102. Port is typically `/dev/cu.usbmodem2301` (number varies — re-enumerates on each reset; update `upload_port` / `monitor_port` in `platformio.ini` if the port changes).
+## Pin Assignments (Non-Standard)
 
-## Source Structure
+| Function   | Waveshare 3.16                 | T-Display-S3                        |
+|:-----------|:-------------------------------|:------------------------------------|
+| Backlight  | 6 – inverted LEDC, ch 1 tmr 3  | 38 – pulse-count dimming, 16 levels |
+| Panel ctrl | CS 0, MOSI 1, SCK 2, RST 16    | CS 6, DC 7, WR 8, RD 9, RST 5       |
+| Data bus   | 16-bit RGB, BGR-wired          | D0–D7 = 39–42, 45–48                |
+| Power      | –                              | 15 must be HIGH (dark on battery)   |
+| Button     | none (`PIN_BUTTON -1`)         | 14 (KEY)                            |
+| Battery    | ADC 4 – unused                 | ADC 4 – unused                      |
 
-| File | Purpose |
-|:-----|:--------|
-| `src/main.cpp` | `setup()`, `loop()`, splash screen, boot IP display, WiFi/NTP init |
-| `src/display.cpp` | Sprite, backlight LEDC, `plot()`, `cls()`, `pushMatrix()`, fades |
-| `src/clock.cpp` | All five clock modes, button handling, font render helpers |
-| `src/web.cpp` | `WebServer` on port 80, LittleFS file serving, REST API handlers |
-| `src/config_nvs.cpp` | NVS persistence via `Preferences` |
-| `include/waveshare_display.h` | `WaveshareDisplay` class + `WavesharePanel` with ST7701 init |
-| `include/config.h` | All constants — pins, timings, colours, WiFi AP name |
-| `include/fonts.h` | PROGMEM font arrays: 5×7, 3×5, 10×14, invader sprites |
-| `data/` | LittleFS web UI: `index.html`, `clock.js`, `style.css`, `pong-logo.png` + `.gz` variants |
+## Architecture Notes
 
-## Library
+**Waveshare RGB panel only** — the ST7789 has its own GRAM, so none of these apply to T-Display-S3:
+- `kRgbClockHz` ≤ 14 MHz. At 18 MHz the LCD DMA's continuous PSRAM reads plus WiFi traffic cause vertical jitter.
+- `cls()` is a single `fillSprite(colourOff)`. The old per-LED loop (2560 writes/frame) caused sync loss under WiFi. Do not restore.
+- Sprite tries internal DMA RAM first, then `setPsram(true)` — after crash resets internal heap is too fragmented for 256 KB.
 
-LovyanGFX (`lovyan03/LovyanGFX`) is required. `TFT_eSPI` cannot drive an ST7701 RGB panel — do not suggest switching.
+**T-Display-S3 backlight** is not PWM: each low pulse on GPIO38 steps the driver down one level (wrapping); low >2.5 ms = off. `blLevel` in `display.cpp` tracks the current level — never write GPIO38 elsewhere or the tracking desyncs.
 
-`WaveshareDisplay` is defined in `include/waveshare_display.h` and extends `lgfx::LGFX_Device`. It contains an inner class `WavesharePanel` that extends `lgfx::Panel_ST7701_Base` and overrides `getInitCommands()` with the full vendor init sequence.
+**Fades**: `fade_down()` / `fade_up()` call `webLoop()` each step; without it the server is dead for ~575 ms per fade.
 
-LovyanGFX framebuffer is allocated in PSRAM (`use_psram = 1` in `panel_.config_detail()`). PSRAM must be present and correctly configured — if it is absent, display init will silently fail or produce garbage output.
+**Web asset gzip**: `serveFile()` prefers `<file>.gz`; Arduino `WebServer` adds `Content-Encoding: gzip` itself. Never `sendHeader("Content-Encoding", ...)` — duplicate header blanks the UI. After editing `data/`, run `gzip -9 -k -f data/clock.js data/style.css data/index.html` then `uploadfs`.
 
-**Sprite allocation** — `LGFX_Sprite._psram` defaults to `false`, meaning `createSprite()` allocates from DMA-capable internal SRAM only (`MALLOC_CAP_DMA`). After a crash/watchdog reset the internal heap is often fragmented enough that a contiguous 256 KB DMA block is unavailable, causing sprite allocation to fail even with 7+ MB of PSRAM free (`ESP.getFreePsram()` reports the total, not contiguous availability). The fix: call `setPsram(false)` (or omit it — it is the default), attempt `createSprite()`, and if that returns null call `setPsram(true)` and retry. This keeps the sprite in fast internal RAM on normal boots and falls back to PSRAM only on crash-recovery boots.
+**WebServer routes**: every file referenced by `index.html` needs its own `server.on()` (incl. `/pong-logo.png`); Arduino-ESP32 3.x logs `[E]` for anything reaching `onNotFound`.
 
-**`cls()` is a single `fillSprite(colourOff)` call** — the previous 80×32 loop of `fillRoundRect(colourOff)` was drawing the off-LED colour on top of an already-off-LED background: visually identical but 2560 individual PSRAM writes per frame. At 50 fps with WiFi active those writes competed with the LCD DMA's continuous PSRAM reads and caused display sync loss (vertical jitter). Do not restore the loop.
+**Date interval** must be 1–59: 0 or 60 makes the next date minute equal the current one and repeats the date for a whole minute. Clamped on load and POST.
 
-## Web Server Architecture
+## NVS Keys (Preferences namespace `"pclock"`)
 
-- Uses Arduino `WebServer` (port 80) — single-threaded, synchronous. Not `AsyncWebServer`.
-- `server.handleClient()` is called via `webLoop()`, which is called from:
-  - `serviceNetworkDelay(ms)` in `clock.cpp` — the cooperative-yield helper used inside all clock mode loops. Calls `webLoop()` every 5 ms for the specified duration.
-  - `tickHousekeeping()` — called at the top of each clock mode's inner `while` loop.
-- **`fade_down()` / `fade_up()` must call `webLoop()` in each step** — at default brightness 180, a fade runs for ~23 steps × 25 ms ≈ 575 ms. Without `webLoop()` calls in the fade loop, the server is completely unresponsive for that window. Word Clock triggers this every minute; all modes trigger it on mode switch. This was the primary cause of intermittent page-load failures.
-- The web server cannot handle parallel connections — browsers that open multiple simultaneous connections (HTML + JS + CSS) will queue them up, each waiting for the previous `handleClient()` to return.
-- **Every file referenced in `index.html` must have an explicit `server.on()` route.** In Arduino ESP32 3.x, any URL without a matching route logs `[E] _handleRequest(): request handler not found` at ERROR level before falling back to `onNotFound` — even when `onNotFound` serves it correctly. `onNotFound` is kept as a safe fallback for unknown paths, but known static assets (including `/pong-logo.png`) must be in the route table.
-- `/screenshot.bmp` streams 768 KB (800×320 @ 24-bit BMP). During streaming the clock frame loop is paused. This endpoint is only triggered by the download button, not auto-polled.
-- **Web asset gzip**: `serveFile()` checks for `<path>.gz` in LittleFS first (text assets only: `.html`, `.js`, `.css`). If found, `streamFile()` serves it directly — Arduino ESP32 `WebServer::_streamFileCore()` **automatically** adds `Content-Encoding: gzip` whenever the file name ends in `.gz`. **Do NOT call `server.sendHeader("Content-Encoding","gzip")` manually** — doing so alongside `streamFile()` on a `.gz` file produces a duplicate header. Browsers interpret `Content-Encoding: gzip, gzip` as double-compression and silently abort the response; the web UI goes completely blank with no error. The gz probe is skipped for `.png` and other binary types because `LittleFS.exists()` on a missing file triggers a spurious `[E][vfs_api.cpp] open(): does not exist` error log. Pre-compressed versions of `clock.js` (9.6 KB), `style.css` (2.2 KB), and `index.html` (1.7 KB) live alongside the originals in `data/`. **When editing any web asset, re-run** `gzip -9 -k -f data/clock.js data/style.css data/index.html` then `pio run -t uploadfs`. Without this, the `.gz` files go stale and browsers receive old content.
-- **TFT freeze on page load**: `streamFile()` is a blocking TCP write that holds the Arduino task for the duration of the transfer. The LCD DMA continues from the last framebuffer but the clock animation pauses — visible as a static frame freeze. Gzip compression reduces `clock.js` from 37 KB to ~9.6 KB, cutting blocking time by ~4×. This is inherent to single-threaded `WebServer`; `Cache-Control: max-age=300` limits it to once per 5-minute window.
+`mode`, `bright`, `ampm`, `onR` `onG` `onB`, `offR` `offG` `offB` (uint8/bool) · `tz`, `ntp`, `fwver` (string) · `dateInt` (uint8). A changed `fwver` resets `mode` to `DEFAULT_CLOCK_MODE`. WiFi credentials are stored by the ESP-IDF WiFi driver, not here.
 
-## Fonts
+## Toolchain
 
-Clock mode rendering uses PROGMEM byte arrays in `include/fonts.h`: `myfont[68][5]` (5×7 dot-matrix), `mybigfont[10][20]` (large digit segments), `mytinyfont[41][3]` (3×5 tiny), and `invader_sprites[3][2][2][5]`. These are display-library-agnostic and render via `putChar()`/`putBigChar()`/`putTinyChar()` into the sprite. No LovyanGFX built-in fonts are used in clock mode.
+Platform pinned to pioarduino 55.03.37 (Arduino-ESP32 3.3.7, IDF 5.5.2) and LovyanGFX 1.2.32. An unpinned `espressif32` silently uses whatever platform is installed.
 
-## Known Hardware Quirks
+## Flash Notes
 
-- **Boot IP display**: after WiFi connects, `showBootIpOnMatrix()` clears the LED canvas and shows "IP" (5×7 font, centred) on row 6 and the IP address in 3×5 tiny font on row 22, holding for 2500 ms (`kBootIpHoldMs`). The 80-col grid always fits any IPv4 without scrolling (max 15 chars × 4 px = 59 px < 80 px). The matrix content is overwritten the moment the first clock mode renders. `showStatus()` and `showIpLine()` also overlay footer text at y=290/305 on the display surface (no physical margin — overlays the bottom of the sprite area temporarily). Port of CYD_PongClock's `showBootIpOnMatrix()`.
-- Board shows a brief valid image during reset even with incorrect backlight control. This means the RGB path is working; suspect backlight polarity first if the screen goes dark after init.
-- PSRAM requires `board_build.arduino.memory_type = qio_opi` — the generic devkitm-1 profile does not set this.
-- `default_16MB.csv` is used (not a custom partition table) — the 16 MB flash layout is handled by the PlatformIO built-in file.
-- `kScreenHeight = 820` is correct for this panel — it is a tall narrow 320 × 820 display.
-- RGB bus data pins are wired in BGR order (d0–d4 = Blue, d5–d10 = Green, d11–d15 = Red). The panel config sets `rgb_order = true` to swap R/B and produce correct colours. If colours look wrong, check this flag first.
-- Backlight LEDC uses **channel 1** (`kBacklightPwmChannel`) on **timer 3** (`LEDC_TIMER_3`). Any future LEDC peripheral (e.g. buzzer, additional PWM) must use a different channel and timer.
-- `gfx.setRotation(1)` is landscape orientation (logical 820×320) used by PongClock. The physical panel is portrait (320×820); rotation 1 flips it so the wide axis is horizontal.
-- **RGB PCLK ceiling with WiFi**: `kRgbClockHz` must be ≤ 14 MHz when WiFi is active. At 18 MHz the LCD DMA demands ~27 MB/s of PSRAM bandwidth; combined with WiFi buffer traffic this saturates the PSRAM bus and causes intermittent DMA underruns visible as vertical jitter (display rolling up/down). At 14 MHz the demand drops to ~21 MB/s, which leaves enough headroom. Do not raise the clock above 14 MHz without re-testing under WiFi load.
-- **Button GPIO4**: wired to GND with `INPUT_PULLUP`. Active LOW. Not connected to the RGB bus or LCD interface.
-
-## Flashing Notes
-
-- Port: typically `/dev/cu.usbmodem2301` (varies — check `ls /dev/cu.usbmodem*` if upload fails to find the current name)
-- `platformio.ini` sets `upload_flags = --no-stub` — this bypasses the stub flasher and uses the ROM bootloader directly. Required for reliable `uploadfs` over USB CDC; without it the stub's higher-speed protocol drops the connection mid-transfer at 0%.
-- If upload still fails: hold BOOT → press RST → release BOOT → retry upload → press RST after flash completes
-- After `uploadfs`: the device does **not** auto-reset with `--no-stub`. Press RST manually to boot the application.
+- Both envs use `upload_flags = --no-stub`: the stub flasher stops responding mid-`uploadfs` over USB CDC.
+- After `uploadfs` with `--no-stub`, neither board auto-resets — press RST.
+- A VS Code serial monitor holds the port and makes upload fail with "port is busy" — close it first.
+- Stuck: hold BOOT → press RST → release BOOT → retry → RST after flash.
 
 ## Global Rules That Do Not Apply Here
 
-- CYD / TFT_eSPI rules: this is not a CYD board and does not use TFT_eSPI
-- Custom partition table: not required — uses `default_16MB.csv`
-- XPT2046 touch: no touchscreen on this board; input is via GPIO4 tactile button
+- CYD / TFT_eSPI rules — LovyanGFX is required (TFT_eSPI cannot drive the ST7701 RGB panel).
+- Custom partition table — both boards use `default_16MB.csv`.
+- XPT2046 / touch rules — no touch on either board; Waveshare is web UI only, T-Display-S3 adds GPIO14.

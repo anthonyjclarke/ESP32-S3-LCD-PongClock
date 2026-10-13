@@ -16,7 +16,7 @@ void loadConfig() {
   // A mismatch means this is the first boot after a flash — reset clock mode to
   // DEFAULT_CLOCK_MODE. Power cycles leave the version tag unchanged → resume last mode.
   char storedVer[16] = "";
-  prefs.getString("fwver", storedVer, sizeof(storedVer));
+  if (prefs.isKey("fwver")) prefs.getString("fwver", storedVer, sizeof(storedVer));
   bool newFirmware = (strcmp(storedVer, FW_VERSION) != 0);
 
   rtCfg.clockMode    = prefs.getUChar("mode",    DEFAULT_CLOCK_MODE);
@@ -29,8 +29,12 @@ void loadConfig() {
   rtCfg.ledOffG      = prefs.getUChar("offG",    COLOUR_LED_OFF_G);
   rtCfg.ledOffB      = prefs.getUChar("offB",    COLOUR_LED_OFF_B);
 
-  prefs.getString("tz",  rtCfg.timezone,  sizeof(rtCfg.timezone));
-  prefs.getString("ntp", rtCfg.ntpServer, sizeof(rtCfg.ntpServer));
+  // isKey() first: getString() on a missing key logs an [E] from the core
+  // on every boot until the web UI first saves config.
+  rtCfg.timezone[0]  = '\0';
+  rtCfg.ntpServer[0] = '\0';
+  if (prefs.isKey("tz"))  prefs.getString("tz",  rtCfg.timezone,  sizeof(rtCfg.timezone));
+  if (prefs.isKey("ntp")) prefs.getString("ntp", rtCfg.ntpServer, sizeof(rtCfg.ntpServer));
 
   // First-boot defaults for strings
   if (rtCfg.timezone[0]  == '\0') strlcpy(rtCfg.timezone,  NTP_TIMEZONE,   sizeof(rtCfg.timezone));
@@ -53,6 +57,9 @@ void loadConfig() {
 
   // Clamp to valid range (guards against stale NVS after NUM_MODES reduction)
   if (rtCfg.clockMode >= NUM_MODES) rtCfg.clockMode = 0;
+  // 0 or 60 would make the next date minute equal the current one and repeat
+  // the date display for the whole minute.
+  if (rtCfg.dateInterval < 1 || rtCfg.dateInterval > 59) rtCfg.dateInterval = DATE_DISPLAY_MINS;
 
   DBG_INFO("Config loaded: mode=%d bright=%d ampm=%d tz=%s",
            rtCfg.clockMode, rtCfg.brightness, rtCfg.ampm, rtCfg.timezone);

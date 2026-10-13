@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.1.0] 13-10-2026
+
+### Added
+- LilyGO T-Display-S3 support (ST7789V 170×320, 8-bit i8080 parallel). One firmware, board picked by PlatformIO env: `waveshare_lcd316` (default) or `tdisplay_s3`. The 80×32 grid maps to 4 px/LED (320×128 sprite, 40 KB, internal RAM) centred with 21 px margins; clock modes are unchanged.
+- `include/tdisplay_s3_display.h` (`Bus_Parallel8` + `Panel_ST7789`, `offset_x` 35, colour inverted) and `include/board_display.h`, which selects the panel class as `BoardDisplay`.
+- T-Display-S3 backlight via the LED driver's pulse-count dimming (16 levels, as in LilyGO's factory example) and GPIO15 panel power enable. Its on-board KEY button (GPIO14) gives short press = next mode, long press = brightness step. GPIO4 is battery sense on this board, so it is not used.
+- Serial boot banner identifying firmware version, build date/time, board, display, chip and revision, flash/PSRAM size, MAC, Arduino-ESP32/IDF versions, reset reason and available controls (`src/sysinfo.cpp`, `include/sysinfo.h`).
+- On-screen boot line showing board, firmware version and build date while WiFi connects.
+- Web UI Device panel on the Clock tab: board, display, firmware and build date, controls, IP and hostname, SSID and RSSI, MAC, chip, memory, free heap/PSRAM, core versions, uptime and last reset reason. It refreshes every 60 s. The pictured PCB shows the board name and hides its button on boards without one.
+- `/api/info` now carries all of the above (`build`, `board`, `panel`, `controls`, `button`, `chip`, `chipRev`, `cpuMHz`, `flashMB`, `psramMB`, `core`, `idf`, `resetReason`, `mac`, `hostname`, `ssid`, `rssi`) and is built with ArduinoJson so an SSID containing quotes cannot break the JSON.
+
+### Fixed
+- Timezone set in the web UI reverted to `Australia/Sydney` on every reboot: `initTime()` used `NTP_TIMEZONE` instead of the saved `rtCfg.timezone`.
+- NTP server setting was saved but never used: now applied with `setServer()` at boot and when changed in the web UI.
+- Date interval setting was saved but never used (`DATE_DISPLAY_MINS` was hard-coded). Now used, and clamped to 1–59 on load and POST — 0 or 60 made the date repeat for a whole minute. Web UI max changed from 60 to 59.
+- Digits mode: the big "1", "4" and "7" were shorter than the other digits (rows 2–11, 2–11 and 0–11 instead of 0–13), because digits without a top or bottom bar stopped their uprights short. Their uprights now run the full 14 rows in both `fonts.h` and the web preview's `clock.js` copy.
+- First long press after boot always jumped to brightness 120: the brightness step now starts from the saved brightness.
+- `[E] nvs_get_str ... NOT_FOUND` logged on boot for `tz`, `ntp` and `fwver` before they were first saved: reads are now skipped with `isKey()`.
+- Waveshare: the firmware configured GPIO4 as a button with a pull-up, but the board has no user button and GPIO4 is its battery-voltage ADC (ADC1 CH3). `PIN_BUTTON` is now `-1` on the Waveshare and button handling is skipped; the board is controlled from the web UI only.
+
+### Changed
+- `WIFI_TIMEOUT_S` restored to `60` (an uncommitted change had set it to `0`, which kept the portal open forever and undid the 2.0.6 offline fallback).
+- `platformio.ini` split into a shared `[env]` plus one env per board; renamed env `esp32-s3-devkitm-1` → `waveshare_lcd316`. Platform pinned to pioarduino 55.03.37 (Arduino-ESP32 3.3.7) and libraries pinned to the installed versions.
+- Board-specific pins, LED sizing (`PIXEL_SIZE`, `PIXEL_INNER`, `PIXEL_RADIUS`, offsets), rotation and boot-status line positions moved into per-board blocks in `config.h`. Removed the unused `kBacklightDefault/Min/MaxBrightness` constants.
+- `/screenshot.bmp` sizes itself from the sprite (320×128 on T-Display-S3).
+- README: Controls section per board (Waveshare web UI only, T-Display-S3 KEY button), Device panel and `/api/info` field reference, boot banner example, per-board Known Quirks, updated asset sizes. CLAUDE.md and `config.h` updated to match.
+- `FW_VERSION` bumped to `2.1.0`.
+
 ## [2.0.6] 09-10-2026
 
 ### Fixed
@@ -8,7 +36,7 @@
 ### Changed
 - `FW_VERSION` bumped to `2.0.6` in `include/config.h`.
 
-## [2.0.5] 2026-04-21
+## [2.0.5] 21-04-2026
 
 ### Fixed
 - Display jitter (vertical roll) when WiFi is active: `cls()` was calling `fillRoundRect(colourOff)` 2560 times (80×32 grid) over an already-`colourOff` background — visually a no-op but 2560 individual PSRAM writes per frame at 50 fps. Combined with the LCD DMA's continuous PSRAM reads and WiFi's PSRAM buffer traffic, this saturated the PSRAM bus and caused intermittent DMA underruns that manifested as display sync loss. Fix: `cls()` is now a single `fillSprite(colourOff)` bulk-fill.
@@ -19,7 +47,7 @@
 ### Changed
 - `FW_VERSION` bumped to `2.0.5` in `include/config.h`.
 
-## [2.0.4] 2026-04-21
+## [2.0.4] 21-04-2026
 
 ### Fixed
 - All 5 clock mode `while` loops now use `keepRunningMode(n)` instead of bare `run_mode()`, so a mode change via the web API takes effect immediately without waiting for the current loop iteration to complete. Port of CYD_PongClock commit `7842f8c`.
@@ -31,7 +59,7 @@
 - Web UI: mode selection is now pills-only. The duplicate mode radio buttons in the Config tab have been removed — mode changes always go through the Clock tab pill row, which saves the selection to the device immediately. Port of CYD_PongClock commits `868ce75` / `7842f8c`.
 - `FW_VERSION` bumped to `2.0.4` in `include/config.h`.
 
-## [2.0.3] 2026-04-11
+## [2.0.3] 11-04-2026
 
 ### Fixed
 - LED colour change full redraw: when LED on/off colours are changed via the web UI, all clock modes now immediately redraw using the new colours without waiting for the next natural refresh cycle.
@@ -42,7 +70,7 @@
 ### Changed
 - `FW_VERSION` bumped to `2.0.3` in `include/config.h`.
 
-## [2.0.2] 2026-04-11
+## [2.0.2] 11-04-2026
 
 ### Added
 - Boot IP address display: after WiFi connects, `showBootIpOnMatrix()` clears the LED canvas and shows "IP" (5×7 font, centred, row 6) and the assigned IP address (3×5 tiny font, centred, row 22) for 2500 ms before NTP sync begins. The 80-col grid always fits any IPv4 address statically — no scroll required (max 15 chars × 4 px = 59 px < 80 px). The display is also shown as footer text at y=290/305 on the display surface. Port of CYD_PongClock `showBootIpOnMatrix()`.
@@ -50,7 +78,7 @@
 ### Changed
 - `FW_VERSION` bumped to `2.0.2` in `include/config.h`.
 
-## [2.0.1] 2026-04-11
+## [2.0.1] 11-04-2026
 
 ### Fixed
 - Web server unresponsive / intermittent page-load failures: `fade_down()` and `fade_up()` now call `webLoop()` in each fade step. At default brightness the fade runs ~23 × 25 ms ≈ 575 ms; without this fix the server was completely dark during that window. Word Clock hit this every minute; all modes hit it on every mode switch.
@@ -67,7 +95,7 @@
 - Pong mode: added intro animation (`pong_setup()`), net drawn at midfield, `beginModeLoop()` / `activeMode` tracking for clean external mode switches.
 - All `delay()` calls in clock modes replaced with `serviceNetworkDelay()` so the web server is serviced continuously rather than only between frames.
 
-## [2.0.0] 2026-04-10
+## [2.0.0] 10-04-2026
 
 ### Added
 - Full PongClock port from CYD_PongClock (ESP32-2432S028R / ILI9341 / TFT_eSPI)
@@ -91,7 +119,7 @@
 - Three-scene demo replaced by PongClock mode dispatcher
 - `platformio.ini` gains `tzapu/WiFiManager`, `ropg/ezTime`, `bblanchon/ArduinoJson@^6.21.0`, `board_build.filesystem = littlefs`
 
-## [1.0.0] 2026-04-10
+## [1.0.0] 10-04-2026
 
 ### Added
 - Initial LovyanGFX bring-up for Waveshare ESP32-S3-LCD-3.16
