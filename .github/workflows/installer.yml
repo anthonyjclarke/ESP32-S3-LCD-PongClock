@@ -1,0 +1,59 @@
+name: Build firmware and publish USB installer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install platformio==6.1.19
+      - name: Validate installer behavior
+        run: node --test tests/installer.test.mjs
+      - name: Regenerate compressed web assets
+        run: gzip -9 -k -f data/clock.js data/style.css data/index.html
+      - name: Build firmware and LittleFS for both boards
+        run: pio run -e waveshare_lcd316 -e tdisplay_s3 && pio run -e waveshare_lcd316 -e tdisplay_s3 -t buildfs
+      - name: Package installer with partition offsets and checksums
+        run: python scripts/export_installer.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pongclock-installer
+          path: .installer-site
+          include-hidden-files: true
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: .installer-site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

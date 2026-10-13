@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- GitHub Pages USB installer with separate, explicitly labelled options for Waveshare ESP32-S3-LCD-3.16 and LilyGO T-Display-S3.
+- ROM-only browser flashing using pinned esptool-js, firmware plus LittleFS installation, download checksums and flash verification.
+- GitHub Actions builds and packages both board images, tests installer behavior, and publishes only from `main`.
+- Code review with prioritized firmware and documentation improvements in `REVIEW.md`.
+
+### Fixed
+- README incorrectly claimed API endpoints require the LittleFS image; static web assets require it, while API routes remain available with WiFi.
+
 ## [2.1.0] 13-10-2026
 
 ### Added

@@ -24,6 +24,23 @@ PongClock for ESP32-S3 display boards. Renders an 80×32 virtual LED grid via Lo
 
 Five clock modes, switched from the web UI on both boards or with the T-Display-S3's KEY button. WiFiManager handles captive-portal provisioning; ezTime handles NTP sync with Olson timezone and DST.
 
+## Install directly from your browser
+
+**[Open the USB web installer](https://anthonyjclarke.github.io/ESP32-S3-LCD-PongClock/)** — no PlatformIO installation needed. The page has a separate install button for each supported board:
+
+| Installer option | Use it for |
+|:-----------------|:-----------|
+| **Install on Waveshare 3.16** | **Waveshare ESP32-S3-LCD-3.16**, 3.16″ ST7701 display, 16 MB flash / 8 MB PSRAM |
+| **Install on T-Display-S3** | **LilyGO T-Display-S3**, 1.9″ ST7789 display, 16 MB flash / 8 MB PSRAM |
+
+Check the board model yourself: both report the same ESP32-S3 chip, so automatic chip detection cannot choose the correct display firmware. Other display models, including T-Display-S3 AMOLED and Pro, are not supported. Touch input is not used.
+
+Use desktop **Chrome or Edge**, a USB data cable, and close serial monitors. Hold **BOOT**, press and release **RST**, then release **BOOT** before selecting the USB port. The installer writes firmware **and LittleFS web assets**, checks download and flash integrity, and uses the ROM bootloader at 115200 baud without a stub. Press **RST** after installation.
+
+Installing replaces firmware and web files. With the existing PongClock partition layout, NVS WiFi and clock settings are retained; changing `FW_VERSION` still resets the clock mode to its default. On first boot, join `ESP32-S3-PongClock`, configure WiFi through its captive portal (`192.168.4.1` if it does not open automatically), then open the IP address displayed by the clock.
+
+The installer implementation is ready for board testing; physical browser flashing on both boards has not yet been verified. The link becomes available after the Pages workflow is deployed. See [publishing the installer](#publishing-the-github-pages-installer) below and use [Build and Flash](#build-and-flash) as the command-line alternative.
+
 ---
 
 ## Hardware
@@ -218,7 +235,7 @@ The web UI assets live in LittleFS and must be uploaded separately:
 pio run -e tdisplay_s3 -t uploadfs
 ```
 
-**This step is required on first flash and any time you change files in `data/`.** Without it the web UI returns 404 and `/api/*` endpoints do not respond.
+**This step is required on first flash and any time you change files in `data/`.** Without it the web UI returns 404; `/api/*` endpoints still work once WiFi is connected. The browser installer includes this step automatically.
 
 > **Note:** both envs set `upload_flags = --no-stub`, which uses the ROM bootloader instead of the stub flasher. This is required for reliable filesystem upload over USB CDC on both boards. On the Waveshare the device does **not** auto-reset after `uploadfs` — press `RST` manually to boot the application.
 
@@ -258,7 +275,33 @@ gzip -9 -k -f data/clock.js data/style.css data/index.html
 pio run -t uploadfs
 ```
 
+The command above targets the default Waveshare environment. For LilyGO use `pio run -e tdisplay_s3 -t uploadfs`.
+
 Do **not** gzip `pong-logo.png` — PNG is already compressed internally and gzip saves less than 1%.
+
+---
+
+## Publishing the GitHub Pages installer
+
+The source lives in `docs/`. `.github/workflows/installer.yml` builds both board environments and their LittleFS images, regenerates gzip assets, and runs the installer tests. `scripts/export_installer.py` copies the compiled images into the site with board-specific manifests, actual partition offsets, file sizes, SHA-256 download checksums and MD5 flash checksums. Binaries are generated artifacts rather than committed files.
+
+In the repository's **Settings → Pages → Build and deployment**, choose **GitHub Actions** as the source. Merge these files into `main`, or run **Build firmware and publish USB installer** manually on `main`. Only `main` publishes; pull requests build and test without deploying. The workflow also uploads a downloadable `pongclock-installer` artifact. The intended URL is [the PongClock installer](https://anthonyjclarke.github.io/ESP32-S3-LCD-PongClock/).
+
+To build and preview locally:
+
+```bash
+gzip -9 -k -f data/clock.js data/style.css data/index.html
+pio run -e waveshare_lcd316 -e tdisplay_s3
+pio run -e waveshare_lcd316 -e tdisplay_s3 -t buildfs
+python3 scripts/export_installer.py
+python3 -m http.server 8000 --directory .installer-site
+```
+
+Open `http://localhost:8000` in desktop Chrome or Edge. Use Node.js 22+ to run `node --test tests/installer.test.mjs`. The export script accepts `--framework-dir` if the Arduino framework is installed outside the default `~/.platformio/packages/framework-arduinoespressif32` location.
+
+The browser installer uses pinned [Espressif esptool-js 0.7.0](https://github.com/espressif/esptool-js) from a CDN. It deliberately avoids `main()` because that starts the stub flasher; the project requires ROM flashing for reliable filesystem uploads over native USB CDC. Physical validation should cover first installation, reinstall with retained settings, interrupted-upload retry and post-install web UI access on **each** board before announcing general availability.
+
+See [REVIEW.md](REVIEW.md) for the code review and suggested firmware improvements.
 
 ---
 
