@@ -36,7 +36,7 @@ Both boards: ESP32-S3R8, 16 MB flash, 8 MB OPI PSRAM (`qio_opi`), native USB CDC
 **Waveshare RGB panel only** — the ST7789 has its own GRAM, so none of these apply to T-Display-S3:
 - `kRgbClockHz` ≤ 14 MHz. At 18 MHz the LCD DMA's continuous PSRAM reads plus WiFi traffic cause vertical jitter.
 - `cls()` is a single `fillSprite(colourOff)`. The old per-LED loop (2560 writes/frame) caused sync loss under WiFi. Do not restore.
-- Sprite tries internal DMA RAM first, then `setPsram(true)` — after crash resets internal heap is too fragmented for 256 KB.
+- Sprite is always in PSRAM: the largest internal DMA block is ~250 KB at `setup()` entry (core 3.3.7), short of the 256 KB sprite, so the internal attempt in `initColours()` always falls back. Allocating earlier cannot help. Heap is rebuilt on every reset, so crash resets do not change this.
 
 **T-Display-S3 backlight** is not PWM: each low pulse on GPIO38 steps the driver down one level (wrapping); low >2.5 ms = off. `blLevel` in `display.cpp` tracks the current level — never write GPIO38 elsewhere or the tracking desyncs.
 

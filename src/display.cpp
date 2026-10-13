@@ -102,8 +102,9 @@ void initColours() {
   colourOff = gfx.color565(COLOUR_LED_OFF_R, COLOUR_LED_OFF_G, COLOUR_LED_OFF_B);
 
   // 8-bit depth (RGB332): 800×320 = 256 KB on Waveshare, 320×128 = 40 KB on T-Display-S3.
-  // Try DMA-capable internal RAM first (faster, less PSRAM bus pressure).
-  // Fall back to PSRAM if internal heap is fragmented (e.g. after a crash reset).
+  // Try DMA-capable internal RAM first (faster, less PSRAM bus pressure), then PSRAM.
+  // Waveshare always lands in PSRAM: on core 3.3.7 the largest internal block is
+  // ~250 KB from the first line of setup(), short of 256 KB. T-Display-S3 fits internally.
   matrixSprite.setColorDepth(8);
   void* buf = matrixSprite.createSprite(LED_WIDTH * PIXEL_SIZE, LED_HEIGHT * PIXEL_SIZE);
   if (!buf) {
