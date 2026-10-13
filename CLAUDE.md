@@ -6,10 +6,10 @@ Five-mode digital clock (Slide, Pong, Digits, Word Clock, Invaders) rendering an
 
 Both boards: ESP32-S3R8, 16 MB flash, 8 MB OPI PSRAM (`qio_opi`), native USB CDC (port varies — `ls /dev/cu.usbmodem*`).
 
-| Board            | Panel                          | LED pitch | Sprite            |
-|:-----------------|:-------------------------------|:----------|:------------------|
-| Waveshare 3.16   | ST7701 RGB parallel, 320×820   | 10 px     | 800×320, 256 KB   |
-| T-Display-S3     | ST7789V 8-bit i8080, 170×320   | 4 px      | 320×128, 40 KB    |
+| Board          | Panel                        | LED pitch | Sprite                   |
+|:---------------|:-----------------------------|:----------|:-------------------------|
+| Waveshare 3.16 | ST7701 RGB parallel, 320×820 | 10 px     | 800×320, 256 KB, PSRAM   |
+| T-Display-S3   | ST7789V 8-bit i8080, 170×320 | 4 px      | 320×128, 40 KB, internal |
 
 ## Board Abstraction
 
@@ -61,6 +61,7 @@ Platform pinned to pioarduino 55.03.37 (Arduino-ESP32 3.3.7, IDF 5.5.2) and Lovy
 - Both envs use `upload_flags = --no-stub`: the stub flasher stops responding mid-`uploadfs` over USB CDC.
 - After `uploadfs` with `--no-stub`, neither board auto-resets — press RST.
 - A VS Code serial monitor holds the port and makes upload fail with "port is busy" — close it first.
+- Both boards enumerate as the same `/dev/cu.usbmodem*` port. Check the MAC esptool prints (Waveshare `80:B5:4E:DA:61:F0`) or the boot banner before flashing — wrong-board firmware boots fine over serial but leaves the screen blank.
 - Stuck: hold BOOT → press RST → release BOOT → retry → RST after flash.
 
 ## Global Rules That Do Not Apply Here

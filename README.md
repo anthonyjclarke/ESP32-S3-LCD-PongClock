@@ -345,7 +345,7 @@ On screen, after the splash, the bottom status line shows the board, firmware ve
 - Backlight LEDC uses channel 1 on timer 3. Any additional LEDC peripherals must use different channel and timer numbers.
 - USB CDC port is `/dev/cu.usbmodem2301` (number varies — re-enumerates on each reset). It disappears during upload and reappears after reset — this is normal.
 - **RGB PCLK ceiling**: `kRgbClockHz` must be ≤ 14 MHz with WiFi active. At 18 MHz the LCD DMA saturates the shared PSRAM bus and causes vertical display jitter. Do not raise the clock without re-testing under WiFi load.
-- **Sprite allocation**: `LGFX_Sprite` defaults to `MALLOC_CAP_DMA` (internal SRAM only). After a crash reset the internal heap is often too fragmented for a contiguous 256 KB block; the code falls back to PSRAM automatically via `setPsram(true)` on retry.
+- **Sprite allocation**: the 800×320 sprite needs 256,000 bytes, but on Arduino-ESP32 3.3.7 the largest free block of internal DMA-capable RAM is about 250 KB from the very start of `setup()`. The internal attempt in `initColours()` therefore always fails, and the sprite lands in PSRAM via `setPsram(true)` on every boot (the boot log shows a `0x3C…` buffer address). This is expected. It is unrelated to crash resets, and allocating earlier would not help. It is also why the RGB pixel-clock and `cls()` limits above matter: the sprite and the LCD frame buffer share the PSRAM bus. The T-Display-S3's 40 KB sprite fits in internal RAM.
 
 ### LilyGO T-Display-S3
 
